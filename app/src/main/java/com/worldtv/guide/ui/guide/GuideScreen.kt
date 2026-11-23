@@ -34,11 +34,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -59,6 +63,7 @@ import com.worldtv.guide.ui.components.SnapTopBar
 import com.worldtv.guide.ui.theme.Snap
 import com.worldtv.guide.util.localTime
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -84,6 +89,34 @@ fun GuideScreen(
     LaunchedEffect(mode) {
         if ((mode == GuideMode.NOW || mode == GuideMode.TONIGHT) && s.date != LocalDate.now()) vm.setDate(LocalDate.now())
     }
+    val hScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val useGrid = s.grid && mode != GuideMode.SEARCH
+    val zone = ZoneId.systemDefault()
+    val dayStart = s.date.atStartOfDay(zone).toInstant()
+    val (gridStart, gridEnd) = when (mode) {
+        GuideMode.TONIGHT -> LocalDate.now().atTime(18, 0).atZone(zone).toInstant() to
+            LocalDate.now().plusDays(1).atTime(2, 0).atZone(zone).toInstant()
+        else -> dayStart to dayStart.plusSeconds(24 * 3600L)
+    }
+    // Computed once per day/view so the grid isn't pulled back while you scroll.
+    val gridFocus = remember(mode, s.date, s.grid) {
+        when {
+            mode == GuideMode.TONIGHT -> gridStart
+            isTodaySelected(s.date) -> Instant.now().minusSeconds(30 * 60)
+            else -> s.date.atTime(18, 30).atZone(zone).toInstant()
+        }
+    }
+    val gridProgrammes = remember(s.programmes, s.query, s.genre) {
+        val q = s.query.trim()
+        val genre: String? = s.genre
+        s.programmes.filter { p ->
+            (q.isEmpty() || p.title.contains(q, true) || p.channelName.contains(q, true)) &&
+                (genre == null || genre in p.genres)
+        }
+    }
+
     val focus = remember { FocusRequester() }
     LaunchedEffect(mode) { if (mode == GuideMode.SEARCH) runCatching { focus.requestFocus() } }
 
@@ -95,7 +128,6 @@ fun GuideScreen(
     val filtered = remember(s.programmes, s.query, s.genre, s.onNowOnly, s.hideEnded, isToday, now, mode) {
         val q = s.query.trim()
         val genre: String? = s.genre
-        val zone = ZoneId.systemDefault()
         val eveningStart = LocalDate.now().atTime(LocalTime.of(18, 0)).atZone(zone).toInstant()
         s.programmes.filter { p ->
             val modeOk = when (mode) {
@@ -121,6 +153,16 @@ fun GuideScreen(
         )
 
         if (mode == GuideMode.ALL) DateStrip(s.date, vm::setDate)
+        if (mode != GuideMode.SEARCH) ViewSwitch(
+            grid = s.grid, onGrid = vm::setGrid,
+            showNow = useGrid && isTodaySelected(s.date),
+            onNow = {
+                scope.launch {
+                    val minutes = ((Instant.now().epochSecond - gridStart.epochSecond) / 60f - 30f).coerceAtLeast(0f)
+                    hScroll.animateScrollTo(with(density) { (3.5.dp * minutes).toPx() }.toInt())
+                }
+            },
+        )
         if (mode == GuideMode.ALL || mode == GuideMode.SEARCH) {
             SearchField(s.query, vm::setQuery, "Search shows or channels",
                 Modifier.padding(horizontal = 10.dp, vertical = 6.dp).focusRequester(focus))
@@ -129,7 +171,7 @@ fun GuideScreen(
             Modifier.padding(vertical = 4.dp),
             contentPadding = PaddingValues(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (mode == GuideMode.ALL) {
+            if (mode == GuideMode.ALL && !useGrid) {
                 if (isToday) {
                     item { Pill("● On now", s.onNowOnly, vm::toggleOnNow) }
                     item { Pill("Hide ended", s.hideEnded, vm::toggleHideEnded) }
@@ -155,6 +197,12 @@ fun GuideScreen(
                     "or add your own XMLTV guide under Sources.",
                 "Guide sources",
             ) { onSources() }
+            useGrid && gridProgrammes.isEmpty() -> CenterMessage("Nothing matches", "Try clearing the search or genre filter.")
+            useGrid -> GuideGrid(
+                programmes = gridProgrammes, windowStart = gridStart, windowEnd = gridEnd,
+                initialFocus = gridFocus, now = now, favKeys = favKeys, hScroll = hScroll,
+                onProgramme = onProgramme,
+            )
             mode == GuideMode.SEARCH && s.query.isBlank() -> CenterMessage(
                 "Search ${"%,d".format(s.programmes.size)} programmes", "Type a show, film, team or channel name.")
             filtered.isEmpty() -> CenterMessage("Nothing matches", "Try clearing the search or filters.")
@@ -184,6 +232,34 @@ fun GuideScreen(
     }
 }
 
+private fun isTodaySelected(d: LocalDate) = d == LocalDate.now()
+
+/** Segmented List / Grid switch, plus a "Now" jump button in grid view. */
+@Composable
+private fun ViewSwitch(grid: Boolean, onGrid: (Boolean) -> Unit, showNow: Boolean, onNow: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier.clip(RoundedCornerShape(8.dp)).background(Snap.Row)
+                .border(1.dp, Snap.Line, RoundedCornerShape(8.dp)),
+        ) {
+            listOf(false to "☰  List", true to "▦  Grid").forEach { (isGrid, label) ->
+                val on = grid == isGrid
+                Box(
+                    Modifier.background(if (on) Snap.accentBar else SolidColor(Color.Transparent))
+                        .clickable { onGrid(isGrid) }.padding(horizontal = 16.dp, vertical = 7.dp),
+                ) {
+                    Text(label, color = if (on) Snap.OnAccent else Snap.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        if (showNow) Pill("⏱ Jump to now", false, onNow)
+    }
+}
+
 private fun dateLabel(d: LocalDate): String {
     val today = LocalDate.now()
     return when (d) {
@@ -198,7 +274,7 @@ private fun dateLabel(d: LocalDate): String {
 private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.clip(RoundedCornerShape(14.dp))
-            .background(if (on) Snap.accentBar else androidx.compose.ui.graphics.SolidColor(Snap.Row))
+            .background(if (on) Snap.accentBar else SolidColor(Snap.Row))
             .border(1.dp, if (on) Color.Transparent else Snap.Line, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -248,7 +324,7 @@ private fun DateStrip(selected: LocalDate, onPick: (LocalDate) -> Unit) {
                 val label = when (d) { today -> "Today"; today.minusDays(1) -> "Yest."; today.plusDays(1) -> "Tmrw"; else -> dow.format(d) }
                 Column(
                     Modifier.clip(RoundedCornerShape(6.dp))
-                        .background(if (sel) Snap.accentBar else androidx.compose.ui.graphics.SolidColor(Snap.Row))
+                        .background(if (sel) Snap.accentBar else SolidColor(Snap.Row))
                         .clickable { onPick(d) }.padding(horizontal = 12.dp, vertical = 5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {

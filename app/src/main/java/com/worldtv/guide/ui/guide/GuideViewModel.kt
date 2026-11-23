@@ -36,6 +36,7 @@ data class GuideState(
     val onNowOnly: Boolean = false,
     val hideEnded: Boolean = true,
     val byChannel: Boolean = true,
+    val grid: Boolean = false,
     val genre: String? = null,
 ) {
     val loading: Boolean get() = feeds.isEmpty() || feeds.any { it.status == FeedStatus.LOADING }
@@ -44,7 +45,7 @@ data class GuideState(
 
 class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) : ViewModel() {
 
-    private val _state = MutableStateFlow(GuideState())
+    private val _state = MutableStateFlow(GuideState(grid = prefs.guideView == "grid"))
     val state: StateFlow<GuideState> = _state.asStateFlow()
     private var loadJob: Job? = null
 
@@ -121,6 +122,10 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
     fun toggleOnNow() = _state.update { it.copy(onNowOnly = !it.onNowOnly) }
     fun toggleHideEnded() = _state.update { it.copy(hideEnded = !it.hideEnded) }
     fun toggleGrouping() = _state.update { it.copy(byChannel = !it.byChannel) }
+    fun setGrid(grid: Boolean) {
+        prefs.guideView = if (grid) "grid" else "list"
+        _state.update { it.copy(grid = grid) }
+    }
     fun setGenre(g: String?) = _state.update { it.copy(genre = g) }
 
     /** Jump here from a channel page: switch to that channel's country and search for it. */
