@@ -1,5 +1,6 @@
 package com.worldtv.guide
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,7 +29,10 @@ import androidx.navigation.navArgument
 import com.worldtv.guide.ui.channels.ChannelDetailScreen
 import com.worldtv.guide.ui.channels.ChannelsScreen
 import com.worldtv.guide.ui.channels.ChannelsViewModel
+import com.worldtv.guide.data.Programme
 import com.worldtv.guide.ui.detail.EpisodeDetailScreen
+import com.worldtv.guide.ui.detail.ProgrammeDetailScreen
+import com.worldtv.guide.ui.sources.SourcesScreen
 import com.worldtv.guide.ui.favorites.FavoritesScreen
 import com.worldtv.guide.ui.guide.GuideScreen
 import com.worldtv.guide.ui.guide.GuideViewModel
@@ -61,6 +65,10 @@ class MainActivity : ComponentActivity() {
                     launchSingleTop = true
                     restoreState = true
                 }
+                fun openProgramme(p: Programme) {
+                    val ep = p.tvmazeEpisodeId
+                    if (ep != null) nav.navigate("episode/$ep") else nav.navigate("programme/${Uri.encode(p.id)}")
+                }
 
                 Scaffold(
                     bottomBar = {
@@ -80,7 +88,19 @@ class MainActivity : ComponentActivity() {
                 ) { pad ->
                     NavHost(nav, startDestination = "guide", modifier = Modifier.padding(bottom = pad.calculateBottomPadding())) {
                         composable("guide") {
-                            GuideScreen(guideVm, app.prefs, onEpisode = { nav.navigate("episode/$it") })
+                            GuideScreen(guideVm, app.prefs, onProgramme = ::openProgramme, onSources = { nav.navigate("sources") })
+                        }
+                        composable("sources") {
+                            SourcesScreen(guideVm, app.prefs, onBack = { nav.popBackStack() })
+                        }
+                        composable(
+                            "programme/{id}",
+                            arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                        ) { entry ->
+                            ProgrammeDetailScreen(
+                                id = Uri.decode(entry.arguments?.getString("id").orEmpty()),
+                                repo = app.repo, prefs = app.prefs, onBack = { nav.popBackStack() },
+                            )
                         }
                         composable("channels") {
                             ChannelsScreen(channelsVm, app.prefs, onChannel = { nav.navigate("channel/$it") })
@@ -89,7 +109,7 @@ class MainActivity : ComponentActivity() {
                             FavoritesScreen(
                                 guideVm, channelsVm, app.prefs,
                                 onChannel = { nav.navigate("channel/$it") },
-                                onEpisode = { nav.navigate("episode/$it") },
+                                onProgramme = ::openProgramme,
                                 onShowInGuide = { name -> guideVm.setQuery(name); goTab("guide") },
                             )
                         }

@@ -2,6 +2,12 @@ package com.worldtv.guide.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -10,6 +16,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.LocalDate
+import java.time.ZoneId
 
 class Directory(
     val countries: List<Country>,
@@ -115,8 +122,90 @@ class TvRepository(cacheDir: File) {
         }
     }
 
+    // ---------------- All guide sources, merged ----------------
+
+    private val resolver = FeedResolver(http, json)
+    private val parseLimit = Semaphore(2) // bound memory: at most two big XML files parsed at once
+    private val parsedCache = object : LinkedHashMap<String, List<Programme>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Programme>>?) = size > 10
+    }
+    private val programmeIndex = java.util.concurrent.ConcurrentHashMap<String, Programme>()
+
+    fun programme(id: String): Programme? = programmeIndex[id]
+
+    /**
+     * Loads every enabled source for [country] on [date] in parallel and emits each
+     * feed's status as it changes (loading → done/failed).
+     */
+    fun guide(
+        country: Country, date: LocalDate, disabled: Set<String>,
+        custom: List<CustomSource>, force: Boolean = false,
+    ): Flow<FeedResult> = channelFlow {
+        val zone = ZoneId.systemDefault()
+        val from = date.atStartOfDay(zone).toInstant()
+        val to = date.plusDays(1).atStartOfDay(zone).toInstant()
+
+        if (SourceIds.TVMAZE !in disabled) launch {
+            val base = FeedResult("tvmaze", SourceIds.TVMAZE, "TVmaze", "TVmaze", FeedStatus.LOADING)
+            send(base)
+            runCatching { schedule(country, date, force).mapNotNull { it.toProgramme() } }
+                .onSuccess { send(base.copy(status = FeedStatus.DONE, programmes = it)) }
+                .onFailure { send(base.copy(status = FeedStatus.FAILED, error = it.message)) }
+        }
+
+        suspend fun resolve(id: String, name: String, block: suspend () -> List<Feed>): List<Feed> =
+            if (id in disabled) emptyList()
+            else runCatching { block() }.getOrElse { e ->
+                send(FeedResult("resolve:$id", id, name, name, FeedStatus.FAILED, error = e.message ?: "Lookup failed"))
+                emptyList()
+            }
+
+        launch {
+            val feeds = resolve(SourceIds.EPGSHARE, "epgshare01") { resolver.epgshare(country) } +
+                resolve(SourceIds.GLOBETV, "GlobeTV") { resolver.globeTv(country) } +
+                resolve(SourceIds.FAST, "Free streaming TV") { resolver.fast(country) } +
+                resolver.custom(country, custom).filter { it.sourceId !in disabled }
+            feeds.distinctBy { it.url }.forEach { f -> launch { loadFeed(f, date, from, to, force) } }
+        }
+    }
+
+    private suspend fun ProducerScope<FeedResult>.loadFeed(
+        f: Feed, date: LocalDate, from: java.time.Instant, to: java.time.Instant, force: Boolean,
+    ) {
+        val base = FeedResult(f.url, f.sourceId, f.sourceName, f.label, FeedStatus.LOADING)
+        send(base)
+        val cacheKey = "${f.url}|$date"
+        runCatching {
+            synchronized(parsedCache) { parsedCache[cacheKey] }?.takeIf { !force }?.let { return@runCatching it }
+            val file = http.getFile(f.url, maxAgeMs = 6L * 60 * 60 * 1000, force = force)
+            parseLimit.withPermit {
+                withContext(Dispatchers.Default) {
+                    XmltvParser.parseFile(file, from, to, f.sourceId, "${f.sourceName} · ${f.label}")
+                }
+            }.also { list ->
+                synchronized(parsedCache) { parsedCache[cacheKey] = list }
+                if (programmeIndex.size > 300_000) programmeIndex.clear()
+                list.forEach { programmeIndex[it.id] = it }
+            }
+        }
+            .onSuccess { send(base.copy(status = FeedStatus.DONE, programmes = it)) }
+            .onFailure { send(base.copy(status = FeedStatus.FAILED, error = it.message ?: it.javaClass.simpleName)) }
+    }
+
     companion object {
         const val IPTV = "https://iptv-org.github.io/api"
         const val TVMAZE = "https://api.tvmaze.com"
     }
 }
+
+enum class FeedStatus { LOADING, DONE, FAILED }
+
+data class FeedResult(
+    val key: String,
+    val sourceId: String,
+    val sourceName: String,
+    val label: String,
+    val status: FeedStatus,
+    val programmes: List<Programme> = emptyList(),
+    val error: String? = null,
+)

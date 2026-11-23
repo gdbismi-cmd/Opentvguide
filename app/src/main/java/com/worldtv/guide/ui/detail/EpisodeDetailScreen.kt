@@ -82,7 +82,7 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs, onBack: () -
 
     val e = ep
     val show = e?.theShow
-    val isFav = show != null && favShows.any { it.id == show.id }
+    val isFav = show != null && favShows.any { it.key == "tm:${show.id}" }
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
@@ -90,7 +90,7 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs, onBack: () -
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             actions = {
                 if (show != null) IconButton(onClick = {
-                    prefs.toggleShow(FavShow(show.id, show.name, show.image?.medium))
+                    prefs.toggleShow(FavShow("tm:${show.id}", show.name, show.image?.medium))
                 }) {
                     Icon(if (isFav) Icons.Filled.Star else Icons.Filled.StarBorder, "Favourite show",
                         tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)

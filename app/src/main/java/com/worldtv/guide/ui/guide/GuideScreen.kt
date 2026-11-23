@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -44,24 +45,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.worldtv.guide.data.FeedResult
+import com.worldtv.guide.data.FeedStatus
 import com.worldtv.guide.data.Prefs
-import com.worldtv.guide.data.TmEpisode
+import com.worldtv.guide.data.Programme
 import com.worldtv.guide.ui.components.CenterMessage
 import com.worldtv.guide.ui.components.CountryPickerSheet
 import com.worldtv.guide.ui.components.Loading
 import com.worldtv.guide.ui.components.SearchField
 import com.worldtv.guide.ui.theme.LiveRed
-import com.worldtv.guide.util.episodeLabel
-import com.worldtv.guide.util.hasEnded
-import com.worldtv.guide.util.isOnNow
 import com.worldtv.guide.util.localTime
-import com.worldtv.guide.util.progress
-import com.worldtv.guide.util.startInstant
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
@@ -69,32 +68,32 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun GuideScreen(vm: GuideViewModel, prefs: Prefs, onEpisode: (Long) -> Unit) {
+fun GuideScreen(vm: GuideViewModel, prefs: Prefs, onProgramme: (Programme) -> Unit, onSources: () -> Unit) {
     val s by vm.state.collectAsStateWithLifecycle()
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
-    val favIds = remember(favShows) { favShows.map { it.id }.toSet() }
+    val favKeys = remember(favShows) { favShows.map { it.key }.toSet() }
     var picking by remember { mutableStateOf(false) }
 
     // Tick every 30 s so "on now" badges and progress bars stay current.
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = Instant.now() } }
 
-    val genres = remember(s.episodes) {
-        s.episodes.flatMap { it.theShow?.genres.orEmpty() }.groupingBy { it }.eachCount()
-            .entries.sortedByDescending { it.value }.map { it.key }
+    val genres = remember(s.programmes) {
+        s.programmes.flatMap { it.genres }.groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }.take(30).map { it.key }
     }
     val isToday = s.date == LocalDate.now()
-    val filtered = remember(s, now) {
+    val filtered = remember(s.programmes, s.query, s.genre, s.onNowOnly, s.hideEnded, isToday, now) {
         val q = s.query.trim()
         val genre: String? = s.genre
         val onNowOnly = s.onNowOnly
         val hideEnded = isToday && s.hideEnded
-        s.episodes.filter { e ->
-            val show = e.theShow
-            (q.isEmpty() || listOfNotNull(show?.name, e.name, e.channelName).any { it.contains(q, ignoreCase = true) }) &&
-                (genre == null || show?.genres.orEmpty().contains(genre)) &&
-                (!onNowOnly || e.isOnNow(now)) &&
-                (!hideEnded || !e.hasEnded(now))
+        s.programmes.filter { p ->
+            (q.isEmpty() || p.title.contains(q, true) || p.channelName.contains(q, true) ||
+                p.subtitle?.contains(q, true) == true) &&
+                (genre == null || genre in p.genres) &&
+                (!onNowOnly || p.isOnNow(now)) &&
+                (!hideEnded || !p.hasEnded(now))
         }
     }
 
@@ -116,7 +115,10 @@ fun GuideScreen(vm: GuideViewModel, prefs: Prefs, onEpisode: (Long) -> Unit) {
                     Icon(Icons.Filled.ArrowDropDown, "Change country")
                 }
             },
-            actions = { IconButton(onClick = { vm.load(force = true) }) { Icon(Icons.Filled.Refresh, "Refresh") } },
+            actions = {
+                IconButton(onClick = onSources) { Icon(Icons.Filled.Tune, "Guide sources") }
+                IconButton(onClick = { vm.load(force = true) }) { Icon(Icons.Filled.Refresh, "Refresh") }
+            },
         )
 
         DateStrip(s.date, vm::setDate)
@@ -133,36 +135,43 @@ fun GuideScreen(vm: GuideViewModel, prefs: Prefs, onEpisode: (Long) -> Unit) {
             }
             items(genres) { g -> FilterChip(s.genre == g, { vm.setGenre(if (s.genre == g) null else g) }, label = { Text(g) }) }
         }
-        Spacer(Modifier.height(4.dp))
+        SourceStrip(s.feeds, onSources)
+        if (s.loading && s.programmes.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp))
 
         when {
-            s.loading -> Loading("Loading ${s.country.name} schedule…")
-            s.error != null -> CenterMessage("Couldn't load the guide", s.error, "Try again") { vm.load(true) }
-            s.episodes.isEmpty() -> CenterMessage(
+            s.programmes.isEmpty() && s.loading -> Loading("Loading ${s.country.name} listings from all sources…")
+            s.programmes.isEmpty() && s.allFailed -> CenterMessage(
+                "Couldn't load the guide",
+                s.feeds.firstOrNull { it.error != null }?.error ?: "Check your connection.",
+                "Try again",
+            ) { vm.load(true) }
+            s.programmes.isEmpty() -> CenterMessage(
                 "No listings for ${s.country.name}",
-                "The free TVmaze listings don't cover every country. Try another country or 🌐 Streaming — " +
-                    "and you can still browse this country's channels in the Channels tab.",
-                "Pick another country",
-            ) { picking = true }
+                "None of the guide sources has listings for this country and day. Try another day or country, " +
+                    "add your own XMLTV guide under Sources, or browse this country's channels in the Channels tab.",
+                "Guide sources",
+            ) { onSources() }
             filtered.isEmpty() -> CenterMessage("Nothing matches", "Try clearing the search or filters.")
             s.byChannel -> {
                 val groups = remember(filtered) {
-                    filtered.groupBy { it.channelName }.toList().sortedBy { it.first.lowercase() }
+                    filtered.groupBy { it.channelKey }.values
+                        .map { list -> Triple(list.first().channelName, list.firstNotNullOfOrNull { it.channelLogo }, list) }
+                        .sortedBy { it.first.lowercase() }
                 }
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
                     item { Count(filtered.size, groups.size) }
-                    groups.forEach { (channel, eps) ->
-                        stickyHeader(key = "h_$channel") { ChannelHeader(channel, eps.size) }
-                        items(eps, key = { "${channel}_${it.id}" }) { e ->
-                            ProgrammeRow(e, now, showChannel = false, fav = e.theShow?.id in favIds) { onEpisode(e.id) }
+                    groups.forEachIndexed { gi, (channel, logo, list) ->
+                        stickyHeader(key = "h_$gi$channel") { ChannelHeader(channel, logo, list.size) }
+                        items(list, key = { "g${gi}_${it.id}" }) { p ->
+                            ProgrammeRow(p, now, showChannel = false, fav = p.favKey in favKeys) { onProgramme(p) }
                         }
                     }
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item { Count(filtered.size, filtered.map { it.channelName }.distinct().size) }
-                items(filtered, key = { it.id }) { e ->
-                    ProgrammeRow(e, now, showChannel = true, fav = e.theShow?.id in favIds) { onEpisode(e.id) }
+                item { Count(filtered.size, filtered.map { it.channelKey }.distinct().size) }
+                items(filtered, key = { it.id }) { p ->
+                    ProgrammeRow(p, now, showChannel = true, fav = p.favKey in favKeys) { onProgramme(p) }
                 }
             }
         }
@@ -177,9 +186,35 @@ fun GuideScreen(vm: GuideViewModel, prefs: Prefs, onEpisode: (Long) -> Unit) {
     }
 }
 
+/** One small chip per guide file, showing whether it loaded and how many programmes it added. */
+@Composable
+private fun SourceStrip(feeds: List<FeedResult>, onClick: () -> Unit) {
+    if (feeds.isEmpty()) return
+    LazyRow(
+        Modifier.padding(top = 6.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items(feeds, key = { it.key }) { f ->
+            val (mark, color) = when (f.status) {
+                FeedStatus.LOADING -> "…" to MaterialTheme.colorScheme.onSurfaceVariant
+                FeedStatus.DONE -> "✓ %,d".format(f.programmes.size) to MaterialTheme.colorScheme.secondary
+                FeedStatus.FAILED -> "✕" to MaterialTheme.colorScheme.error
+            }
+            Surface(onClick = onClick, shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Text(
+                    "${if (f.label == f.sourceName) f.label else "${f.sourceName} ${f.label}"} $mark",
+                    Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun Count(programmes: Int, channels: Int) {
-    Text("$programmes programmes on $channels channels · times in your time zone",
+    Text("%,d programmes on %,d channels · times in your time zone".format(programmes, channels),
         Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
@@ -209,16 +244,17 @@ private fun DateStrip(selected: LocalDate, onPick: (LocalDate) -> Unit) {
 }
 
 @Composable
-private fun ChannelHeader(name: String, count: Int) {
+private fun ChannelHeader(name: String, logo: String?, count: Int) {
     Row(
         Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primary),
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center) {
-            Text(name.take(2).uppercase(), color = MaterialTheme.colorScheme.onPrimary,
+            Text(name.take(2).uppercase(), color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            if (logo != null) AsyncImage(logo, null, Modifier.fillMaxSize().padding(3.dp), contentScale = ContentScale.Fit)
         }
         Spacer(Modifier.width(12.dp))
         Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
@@ -228,15 +264,13 @@ private fun ChannelHeader(name: String, count: Int) {
 }
 
 @Composable
-fun ProgrammeRow(e: TmEpisode, now: Instant, showChannel: Boolean, fav: Boolean, onClick: () -> Unit) {
-    val live = e.isOnNow(now)
-    val ended = e.hasEnded(now)
-    val show = e.theShow
+fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean, onClick: () -> Unit) {
+    val live = p.isOnNow(now)
+    val ended = p.hasEnded(now)
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(64.dp)) {
-                Text(e.startInstant?.localTime() ?: e.airtime.orEmpty(), style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                Text(p.start.localTime(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                     color = if (ended) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                 if (live) Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(7.dp).clip(CircleShape).background(LiveRed))
@@ -244,31 +278,35 @@ fun ProgrammeRow(e: TmEpisode, now: Instant, showChannel: Boolean, fav: Boolean,
                     Text("LIVE", style = MaterialTheme.typography.labelSmall, color = LiveRed, fontWeight = FontWeight.Bold)
                 }
             }
-            AsyncImage(
-                model = show?.image?.medium, contentDescription = null,
-                modifier = Modifier.size(width = 44.dp, height = 60.dp).clip(RoundedCornerShape(6.dp))
+            Box(
+                Modifier.size(width = 44.dp, height = 60.dp).clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                val img = p.image ?: p.channelLogo.takeIf { showChannel }
+                if (img != null) AsyncImage(img, null, Modifier.fillMaxSize(),
+                    contentScale = if (p.image != null) ContentScale.Crop else ContentScale.Fit)
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (fav) {
-                        Icon(Icons.Filled.Star, "Favourite", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Filled.Star, "Following", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(4.dp))
                     }
-                    Text(show?.name ?: e.name.orEmpty(), style = MaterialTheme.typography.bodyLarge,
+                    Text(p.title, style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 val sub = listOfNotNull(
-                    e.channelName.takeIf { showChannel },
-                    e.episodeLabel().ifBlank { null },
-                    show?.genres?.firstOrNull(),
+                    p.channelName.takeIf { showChannel },
+                    p.subtitle,
+                    p.genres.firstOrNull(),
                 ).joinToString(" · ")
                 if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (live) {
                     Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(progress = { e.progress(now) }, modifier = Modifier.fillMaxWidth().height(3.dp))
+                    LinearProgressIndicator(progress = { p.progress(now) }, modifier = Modifier.fillMaxWidth().height(3.dp))
                 }
             }
         }

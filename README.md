@@ -22,13 +22,20 @@ A worldwide TV guide app for Android, built with Kotlin and Jetpack Compose.
 
 ## Data sources (free, no API keys)
 
-| What | Source | Licence |
-|---|---|---|
-| TV schedules / programmes | [TVmaze API](https://www.tvmaze.com/api) | CC BY-SA |
-| Worldwide channels, countries, categories, logos | [iptv-org/api](https://github.com/iptv-org/api) | Unlicense / public domain |
+The guide merges every enabled source into one list and removes duplicates. You can switch sources on or off, and add your own, from the **⚙ Sources** button in the TV Guide.
 
-TVmaze's listings are strongest for the US, UK, Canada, Australia, most of Europe, Japan and a few others. Some countries have little or no listing data. For those countries the guide says so, and you can still browse their channels in the **Channels** tab.
-Credit TVmaze in your app's store listing if you publish it. The app already credits both sources in the UI.
+| What | Source | Coverage |
+|---|---|---|
+| Show listings with artwork and synopses | [TVmaze API](https://www.tvmaze.com/api) (CC BY-SA) | US, UK, CA, AU, most of Europe, JP, plus streaming services |
+| Channel-by-channel XMLTV guides | [epgshare01](https://epgshare01.online/epgshare01/) | About 70 countries, rebuilt daily. Includes India, the Gulf, Latin America and Southeast Asia, plus Plex, Peacock and DistroTV |
+| Per-country XMLTV guides | [GlobeTV EPG](https://github.com/globetvapp/epg) | Country folders on GitHub, updated daily |
+| Free streaming TV guides | [i.mjh.nz](https://github.com/matthuisman/i.mjh.nz) | Pluto TV, Samsung TV Plus, Plex and Roku, shown under 🌐 Streaming |
+| Your own guides | Any XMLTV URL (`.xml` / `.xml.gz`) | Show it for one country or for all of them |
+| Worldwide channels, countries, categories, logos | [iptv-org/api](https://github.com/iptv-org/api) (public domain) | About 200 countries |
+
+XMLTV files are streamed and parsed on the device, and only the selected day is kept in memory. Downloaded guide files are cached for 6 hours, and the cache is capped at about 300 MB. Some country files are several MB, so the first load of a country on mobile data takes a moment.
+
+Each chip under the filters shows one guide file: **✓** means loaded (with a programme count), **…** means loading, and **✕** means it failed. Tap a chip to manage sources.
 
 ## Download the APK
 

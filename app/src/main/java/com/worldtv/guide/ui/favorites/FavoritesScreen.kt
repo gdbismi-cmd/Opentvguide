@@ -39,23 +39,23 @@ import com.worldtv.guide.ui.components.SectionHeader
 import com.worldtv.guide.ui.guide.GuideViewModel
 import com.worldtv.guide.ui.guide.ProgrammeRow
 import com.worldtv.guide.data.Prefs
-import com.worldtv.guide.util.hasEnded
+import com.worldtv.guide.data.Programme
 import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
     guideVm: GuideViewModel, channelsVm: ChannelsViewModel, prefs: Prefs,
-    onChannel: (String) -> Unit, onEpisode: (Long) -> Unit, onShowInGuide: (String) -> Unit,
+    onChannel: (String) -> Unit, onProgramme: (Programme) -> Unit, onShowInGuide: (String) -> Unit,
 ) {
     val guide by guideVm.state.collectAsStateWithLifecycle()
     val ch by channelsVm.state.collectAsStateWithLifecycle()
     val favChannels by prefs.favChannels.collectAsStateWithLifecycle()
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
     val now = remember { Instant.now() }
-    val showIds = remember(favShows) { favShows.map { it.id }.toSet() }
-    val upcoming = remember(guide.episodes, showIds) {
-        guide.episodes.filter { it.theShow?.id in showIds && !it.hasEnded(now) }
+    val showKeys = remember(favShows) { favShows.map { it.key }.toSet() }
+    val upcoming = remember(guide.programmes, showKeys) {
+        guide.programmes.filter { it.favKey in showKeys && !it.hasEnded(now) }
     }
     val dir = ch.directory
     val channels = remember(dir, favChannels) {
@@ -77,10 +77,10 @@ fun FavoritesScreen(
                         Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 items(upcoming, key = { "u${it.id}" }) { e ->
-                    ProgrammeRow(e, now, showChannel = true, fav = true) { onEpisode(e.id) }
+                    ProgrammeRow(e, now, showChannel = true, fav = true) { onProgramme(e) }
                 }
                 item { SectionHeader("Shows you follow") }
-                items(favShows, key = { "s${it.id}" }) { s ->
+                items(favShows, key = { "s${it.key}" }) { s ->
                     Row(
                         Modifier.fillMaxWidth().clickable { onShowInGuide(s.name) }.padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
