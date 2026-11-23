@@ -156,7 +156,7 @@ private fun SourceCard(
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Switch(
                     checked = enabled, onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(checkedTrackColor = Snap.Accent, checkedThumbColor = Color.Black),
+                    colors = SwitchDefaults.colors(checkedTrackColor = Snap.Accent, checkedThumbColor = Snap.OnAccent),
                 )
             }
             Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

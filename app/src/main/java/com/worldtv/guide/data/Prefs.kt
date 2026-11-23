@@ -29,6 +29,10 @@ class Prefs(context: Context) {
     )
     val customSources: StateFlow<List<CustomSource>> = _custom.asStateFlow()
 
+    var themeId: String?
+        get() = sp.getString(KEY_THEME, null)
+        set(v) { sp.edit().putString(KEY_THEME, v).apply() }
+
     var guideCountry: String
         get() = sp.getString(KEY_COUNTRY, null) ?: defaultCountry()
         set(v) { sp.edit().putString(KEY_COUNTRY, v).apply() }
@@ -85,6 +89,7 @@ class Prefs(context: Context) {
     companion object {
         private const val KEY_SH = "fav_shows"
         private const val KEY_COUNTRY = "guide_country"
+        private const val KEY_THEME = "theme"
         private const val KEY_DISABLED = "disabled_sources"
         private const val KEY_CUSTOM = "custom_sources"
     }

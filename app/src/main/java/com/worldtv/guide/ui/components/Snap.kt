@@ -80,15 +80,15 @@ fun SnapTopBar(
                 ) { Text(badge ?: "📺", fontSize = 17.sp) }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f, fill = false)) {
-                    Text(title, color = Snap.Text, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    Text(title, color = Snap.BarText, fontWeight = FontWeight.Bold, fontSize = 17.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (subtitle != null) Text(subtitle, color = Snap.Muted, fontSize = 11.sp, maxLines = 1,
+                    if (subtitle != null) Text(subtitle, color = Snap.BarMuted, fontSize = 11.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
                 }
                 if (onTitleClick != null) Text("  ▾", color = Snap.Accent, fontSize = 13.sp)
             }
             actions()
-            Text(fmt.format(clock), color = Snap.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            Text(fmt.format(clock), color = Snap.BarText, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 8.dp))
         }
         Box(Modifier.fillMaxWidth().height(2.dp).background(Snap.accentBar))
@@ -103,7 +103,7 @@ fun SoftKeyBar(
     center: ImageVector? = null, onCenter: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().background(Snap.softKeys).windowInsetsPadding(WindowInsets.navigationBars)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Snap.Line))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
         Row(Modifier.fillMaxWidth().height(50.dp), verticalAlignment = Alignment.CenterVertically) {
             SoftKey(left, Modifier.weight(1f), TextAlign.Start, onLeft)
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -111,7 +111,7 @@ fun SoftKeyBar(
                     Modifier.size(width = 56.dp, height = 34.dp).clip(RoundedCornerShape(17.dp))
                         .background(Snap.accentBar).clickable(onClick = onCenter),
                     contentAlignment = Alignment.Center,
-                ) { Icon(center, null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+                ) { Icon(center, null, tint = Snap.OnAccent, modifier = Modifier.size(20.dp)) }
             }
             SoftKey(right, Modifier.weight(1f), TextAlign.End, onRight)
         }
@@ -125,7 +125,7 @@ private fun SoftKey(label: String?, modifier: Modifier, align: TextAlign, onClic
             .padding(horizontal = 18.dp),
         contentAlignment = if (align == TextAlign.Start) Alignment.CenterStart else Alignment.CenterEnd,
     ) {
-        if (label != null) Text(label, color = Snap.Text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        if (label != null) Text(label, color = Snap.KeyText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }
 
@@ -173,9 +173,9 @@ fun SnapSection(text: String, trailing: String? = null, modifier: Modifier = Mod
     ) {
         Box(Modifier.size(width = 3.dp, height = 14.dp).background(Snap.Accent))
         Spacer(Modifier.width(8.dp))
-        Text(text, Modifier.weight(1f), color = Snap.Text, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+        Text(text, Modifier.weight(1f), color = Snap.SectionText, fontWeight = FontWeight.Bold, fontSize = 13.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (trailing != null) Text(trailing, color = Snap.Muted, fontSize = 12.sp)
+        if (trailing != null) Text(trailing, color = Snap.SectionText.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
 

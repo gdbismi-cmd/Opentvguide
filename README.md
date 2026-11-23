@@ -15,7 +15,8 @@ The interface is styled after classic mobile portal apps. It has a home screen o
   - **Streaming**: schedules for Netflix, Prime Video, Disney+, Pluto TV, Samsung TV Plus and others.
   - **Country**: choose any of about 200 countries.
   - **Sources**: turn guide sources on or off, or add your own XMLTV links.
-  - **About**: credits for the data sources.
+  - **Themes**: choose one of five Snaptu-style skins (Classic, Light, Ocean, Lime, Berry). The change applies instantly and is remembered.
+- The **Options** soft key opens a menu with Themes, Country, Guide sources, Refresh and About.
 - **Programme pages** show artwork, synopsis, genres, a live progress bar, **Remind me** (adds the programme to your calendar) and ☆ follow.
 - Air times are converted to your phone's time zone.
 - Downloaded listings are cached, so the app still shows the last data it downloaded when you're offline.
@@ -78,6 +79,8 @@ app/src/main/java/com/worldtv/guide/
 ├── ui/favorites/              followed shows
 ├── ui/sources/                guide sources & custom XMLTV
 ├── ui/detail/                 programme detail pages
+├── ui/options/                Options menu + theme picker
+├── ui/theme/Theme.kt          skins (palettes) + Material theme
 ├── ui/components/Snap.kt      title bar, soft keys, tiles, list rows
 └── util/Util.kt               time & HTML helpers
 ```

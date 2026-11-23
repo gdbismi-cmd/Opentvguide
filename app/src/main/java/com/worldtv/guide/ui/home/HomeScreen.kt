@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Public
@@ -27,9 +27,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,10 +60,10 @@ private data class Tile(val label: String, val icon: ImageVector, val color: Col
 fun HomeScreen(
     vm: GuideViewModel, prefs: Prefs,
     onGuide: (GuideMode) -> Unit, onFollowing: () -> Unit, onCountry: () -> Unit, onSources: () -> Unit,
+    onThemes: () -> Unit,
 ) {
     val s by vm.state.collectAsStateWithLifecycle()
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
-    var about by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = Instant.now() } }
 
@@ -90,7 +88,7 @@ fun HomeScreen(
         },
         Tile("Country", Icons.Filled.Public, Color(0xFF8E24AA), null) { onCountry() },
         Tile("Sources", Icons.Filled.Tune, Color(0xFF546E7A), null) { onSources() },
-        Tile("About", Icons.Filled.Info, Color(0xFF3949AB), null) { about = true },
+        Tile("Themes", Icons.Filled.Palette, Color(0xFFE91E63), null) { onThemes() },
     )
 
     Column(Modifier.fillMaxSize().background(Snap.Canvas)) {
@@ -132,17 +130,6 @@ fun HomeScreen(
         }
     }
 
-    if (about) AlertDialog(
-        onDismissRequest = { about = false },
-        confirmButton = { TextButton(onClick = { about = false }) { Text("OK") } },
-        title = { Text("WorldTV Guide") },
-        text = {
-            Text(
-                "A worldwide TV guide.\n\nListings: TVmaze (CC BY-SA), epgshare01, GlobeTV EPG, i.mjh.nz, " +
-                    "plus any XMLTV guides you add under Sources.\nCountry list: iptv-org.",
-            )
-        },
-    )
 }
 
 private fun short(n: Int): String = if (n >= 1000) "${n / 1000}k" else n.toString()

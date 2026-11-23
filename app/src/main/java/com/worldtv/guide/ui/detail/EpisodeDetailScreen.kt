@@ -93,7 +93,7 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs) {
                     prefs.toggleShow(FavShow("tm:${show.id}", show.name, show.image?.medium))
                 }) {
                     Icon(if (isFav) Icons.Filled.Star else Icons.Filled.StarBorder, "Favourite show",
-                        tint = if (isFav) Snap.Accent else Snap.Text)
+                        tint = if (isFav) Snap.Accent else Snap.BarText)
                 }
             },
         )

@@ -117,7 +117,7 @@ fun GuideScreen(
             subtitle = "${s.country.name} · ${dateLabel(s.date)}",
             badge = s.country.flag,
             onTitleClick = onCountry,
-            actions = { IconButton(onClick = onSources) { Icon(Icons.Filled.Tune, "Guide sources", tint = Snap.Text) } },
+            actions = { IconButton(onClick = onSources) { Icon(Icons.Filled.Tune, "Guide sources", tint = Snap.BarText) } },
         )
 
         if (mode == GuideMode.ALL) DateStrip(s.date, vm::setDate)
@@ -202,7 +202,7 @@ private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
             .border(1.dp, if (on) Color.Transparent else Snap.Line, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Text(text, color = if (on) Color.Black else Snap.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, color = if (on) Snap.OnAccent else Snap.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -217,8 +217,8 @@ private fun SourceStrip(feeds: List<FeedResult>, onClick: () -> Unit) {
         items(feeds, key = { it.key }) { f ->
             val (mark, color) = when (f.status) {
                 FeedStatus.LOADING -> "…" to Snap.Muted
-                FeedStatus.DONE -> "✓ %,d".format(f.programmes.size) to Color(0xFF7CD992)
-                FeedStatus.FAILED -> "✕" to Color(0xFFFF6B6B)
+                FeedStatus.DONE -> "✓ %,d".format(f.programmes.size) to Snap.Ok
+                FeedStatus.FAILED -> "✕" to Snap.Bad
             }
             Text(
                 "${if (f.label == f.sourceName) f.label else "${f.sourceName} ${f.label}"} $mark",
@@ -252,8 +252,8 @@ private fun DateStrip(selected: LocalDate, onPick: (LocalDate) -> Unit) {
                         .clickable { onPick(d) }.padding(horizontal = 12.dp, vertical = 5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(label, fontSize = 11.sp, color = if (sel) Color.Black else Snap.Muted, fontWeight = FontWeight.Bold)
-                    Text("${d.dayOfMonth}", fontSize = 16.sp, color = if (sel) Color.Black else Snap.Text, fontWeight = FontWeight.Bold)
+                    Text(label, fontSize = 11.sp, color = if (sel) Snap.OnAccent else Snap.Muted, fontWeight = FontWeight.Bold)
+                    Text("${d.dayOfMonth}", fontSize = 16.sp, color = if (sel) Snap.OnAccent else Snap.Text, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -266,15 +266,15 @@ private fun ChannelHeader(name: String, logo: String?, count: Int) {
         Modifier.fillMaxWidth().background(Snap.section).padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF0E1118)),
+        Box(Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well),
             contentAlignment = Alignment.Center) {
             Text(name.take(2).uppercase(), color = Snap.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             if (logo != null) AsyncImage(logo, null, Modifier.fillMaxSize().padding(2.dp), contentScale = ContentScale.Fit)
         }
         Spacer(Modifier.width(10.dp))
-        Text(name, Modifier.weight(1f), color = Snap.Text, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+        Text(name, Modifier.weight(1f), color = Snap.SectionText, fontWeight = FontWeight.Bold, fontSize = 14.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("$count", color = Snap.Muted, fontSize = 12.sp)
+        Text("$count", color = Snap.SectionText.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
 
@@ -284,7 +284,7 @@ fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean,
     val ended = p.hasEnded(now)
     Row(
         Modifier.fillMaxWidth()
-            .background(if (live) Color(0xFF1A2333) else if (index % 2 == 0) Snap.Row else Snap.RowAlt)
+            .background(if (live) Snap.LiveRow else if (index % 2 == 0) Snap.Row else Snap.RowAlt)
             .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -299,7 +299,7 @@ fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean,
         }
         val img = p.image ?: p.channelLogo.takeIf { showChannel }
         if (img != null) {
-            Box(Modifier.size(width = 40.dp, height = 40.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF0E1118))) {
+            Box(Modifier.size(width = 40.dp, height = 40.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well)) {
                 AsyncImage(img, null, Modifier.fillMaxSize(),
                     contentScale = if (p.image != null) ContentScale.Crop else ContentScale.Fit)
             }

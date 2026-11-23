@@ -71,7 +71,7 @@ fun ProgrammeDetailScreen(id: String, repo: TvRepository, prefs: Prefs) {
             actions = {
                 if (p != null) IconButton(onClick = { prefs.toggleShow(FavShow(p.favKey, p.title, p.image)) }) {
                     Icon(if (following) Icons.Filled.Star else Icons.Filled.StarBorder, "Follow show",
-                        tint = if (following) Snap.Accent else Snap.Text)
+                        tint = if (following) Snap.Accent else Snap.BarText)
                 }
             },
         )

@@ -3,6 +3,7 @@ package com.worldtv.guide
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -35,6 +36,8 @@ import com.worldtv.guide.ui.guide.GuideMode
 import com.worldtv.guide.ui.guide.GuideScreen
 import com.worldtv.guide.ui.guide.GuideViewModel
 import com.worldtv.guide.ui.home.HomeScreen
+import com.worldtv.guide.ui.options.OptionsScreen
+import com.worldtv.guide.ui.options.ThemesScreen
 import com.worldtv.guide.ui.sources.SourcesScreen
 import com.worldtv.guide.ui.theme.Snap
 import com.worldtv.guide.ui.theme.WorldTvTheme
@@ -45,7 +48,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Title and soft-key bars are dark in every skin, so system bar icons stay light.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         val app = application as WorldTvApp
         setContent {
             WorldTvTheme {
@@ -71,8 +78,18 @@ class MainActivity : ComponentActivity() {
                                     onFollowing = { nav.navigate("following") },
                                     onCountry = { nav.navigate("country") },
                                     onSources = { nav.navigate("sources") },
+                                    onThemes = { nav.navigate("themes") },
                                 )
                             }
+                            composable("options") {
+                                OptionsScreen(
+                                    guideVm,
+                                    onThemes = { nav.navigate("themes") },
+                                    onSources = { nav.navigate("sources") },
+                                    onCountry = { nav.navigate("country") },
+                                )
+                            }
+                            composable("themes") { ThemesScreen(app.prefs) }
                             composable(
                                 "guide/{mode}",
                                 arguments = listOf(navArgument("mode") { type = NavType.StringType }),
@@ -111,7 +128,7 @@ class MainActivity : ComponentActivity() {
                     }
                     SoftKeyBar(
                         left = if (atHome) "Options" else "Home",
-                        onLeft = { if (atHome) nav.navigate("sources") else goHome() },
+                        onLeft = { if (atHome) nav.navigate("options") else goHome() },
                         right = if (atHome) "Exit" else "Back",
                         onRight = { if (atHome) finish() else nav.popBackStack() },
                         center = if (atHome || route.startsWith("guide")) Icons.Filled.Refresh else Icons.Filled.Home,

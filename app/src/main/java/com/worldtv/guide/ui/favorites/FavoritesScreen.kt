@@ -70,7 +70,7 @@ fun FavoritesScreen(
                 SnapMenuRow(
                     title = f.name, subtitle = "Find in guide", index = i,
                     leading = {
-                        Box(Modifier.size(34.dp, 46.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF0E1118))) {
+                        Box(Modifier.size(34.dp, 46.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well)) {
                             if (f.image != null) AsyncImage(f.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }
                     },
