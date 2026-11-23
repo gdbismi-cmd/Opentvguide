@@ -61,18 +61,23 @@ Before you publish to Google Play, set up your own signing key in `app/build.gra
 
 ```
 app/src/main/java/com/worldtv/guide/
-├── MainActivity.kt            navigation + bottom bar
+├── MainActivity.kt            navigation + soft-key bar
 ├── WorldTvApp.kt              app-wide repository & prefs
 ├── data/
-│   ├── Models.kt              TVmaze + iptv-org models
+│   ├── Models.kt              TVmaze + country models
+│   ├── Programme.kt           common programme model (all sources)
+│   ├── Xmltv.kt               streaming XMLTV parser
+│   ├── Sources.kt             source list + per-country feed discovery
 │   ├── Http.kt                OkHttp with file cache / offline fallback
-│   ├── Repository.kt          schedules, channel directory
-│   └── Prefs.kt               favourites & settings
-├── ui/guide/                  TV guide screen + ViewModel
-├── ui/channels/               channel browser + channel detail
-├── ui/detail/                 programme detail
-├── ui/favorites/              favourites
-├── ui/components/             country picker, search, etc.
+│   ├── Repository.kt          merged multi-source guide loading
+│   └── Prefs.kt               followed shows, source settings
+├── ui/home/                   tile launcher home screen
+├── ui/guide/                  On Now / Tonight / Full Guide / Search
+├── ui/country/                country menu
+├── ui/favorites/              followed shows
+├── ui/sources/                guide sources & custom XMLTV
+├── ui/detail/                 programme detail pages
+├── ui/components/Snap.kt      title bar, soft keys, tiles, list rows
 └── util/Util.kt               time & HTML helpers
 ```
 
