@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A TV screen with a globe inside. 108dp canvas, art kept in the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- antenna -->
+    <path android:strokeColor="#FFB347" android:strokeWidth="2.5" android:strokeLineCap="round"
+        android:pathData="M46,30 L54,37 L62,30" />
+    <!-- tv body -->
+    <path android:fillColor="#FFB347"
+        android:pathData="M30,37 h48 a5,5 0 0 1 5,5 v28 a5,5 0 0 1 -5,5 h-48 a5,5 0 0 1 -5,-5 v-28 a5,5 0 0 1 5,-5 z" />
+    <!-- screen -->
+    <path android:fillColor="#1B1F3B"
+        android:pathData="M33,41 h42 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-42 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z" />
+    <!-- globe -->
+    <path android:strokeColor="#7FD1FF" android:strokeWidth="2" android:fillColor="#00000000"
+        android:pathData="M54,45 a11,11 0 1 1 0,22 a11,11 0 1 1 0,-22 z" />
+    <path android:strokeColor="#7FD1FF" android:strokeWidth="1.6" android:fillColor="#00000000"
+        android:pathData="M54,45 a5,11 0 1 1 0,22 a5,11 0 1 1 0,-22 z M43,56 h22 M45,50.5 h18 M45,61.5 h18" />
+    <!-- stand -->
+    <path android:fillColor="#FFB347" android:pathData="M44,77 h20 v3 h-20 z" />
+</vector>
