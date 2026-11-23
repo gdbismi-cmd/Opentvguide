@@ -11,6 +11,7 @@ object SourceIds {
     const val EPGSHARE = "epgshare01"
     const val GLOBETV = "globetv"
     const val FAST = "fast"
+    const val EPGPW = "epgpw"
 }
 
 data class SourceInfo(val id: String, val name: String, val description: String, val url: String)
@@ -22,6 +23,9 @@ val BUILT_IN_SOURCES = listOf(
     SourceInfo(SourceIds.EPGSHARE, "epgshare01",
         "Full channel-by-channel XMLTV guides for about 70 countries (incl. India, Middle East, Latin America, Asia), rebuilt daily.",
         "https://epgshare01.online"),
+    SourceInfo(SourceIds.EPGPW, "epg.pw",
+        "Daily XMLTV guides for 20 countries incl. India, China, Japan, Southeast Asia, Russia and Brazil.",
+        "https://epg.pw/xmltv.html"),
     SourceInfo(SourceIds.GLOBETV, "GlobeTV EPG",
         "Per-country XMLTV guides hosted on GitHub, updated daily.",
         "https://github.com/globetvapp/epg"),
@@ -62,6 +66,17 @@ class FeedResolver(private val http: CachedHttp, private val json: Json) {
         }
     }
 
+    suspend fun epgPw(country: Country): List<Feed> {
+        if (country.code == STREAMING.code) return emptyList()
+        val codes = runCatching {
+            val html = http.get("https://epg.pw/xmltv.html", "epgpw_index.html", day)
+            Regex("epg_([A-Z]{2})\\.xml").findAll(html).map { it.groupValues[1] }.toSet().ifEmpty { null }
+        }.getOrNull() ?: EPGPW_FALLBACK
+        val cc = country.isoCode
+        if (cc !in codes) return emptyList()
+        return listOf(Feed(SourceIds.EPGPW, "epg.pw", cc, "https://epg.pw/xmltv/epg_$cc.xml.gz"))
+    }
+
     suspend fun globeTv(country: Country): List<Feed> {
         if (country.code == STREAMING.code) return emptyList()
         val api = "https://api.github.com/repos/globetvapp/epg/contents"
@@ -97,6 +112,13 @@ class FeedResolver(private val http: CachedHttp, private val json: Json) {
     fun custom(country: Country, sources: List<CustomSource>): List<Feed> =
         sources.filter { it.country == null || it.country == country.code }
             .map { Feed("custom:${it.id}", it.name, it.name, it.url) }
+
+    private companion object {
+        val EPGPW_FALLBACK = setOf(
+            "AU", "BR", "CA", "CN", "DE", "FR", "GB", "HK", "ID", "IN",
+            "JP", "MY", "NZ", "PH", "RU", "SG", "TW", "US", "VN", "ZA",
+        )
+    }
 
     private fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9]"), "")
 

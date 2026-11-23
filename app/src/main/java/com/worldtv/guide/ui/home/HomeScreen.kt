@@ -125,7 +125,7 @@ fun HomeScreen(
             items(tiles, key = { it.label }) { t -> SnapTile(t.label, t.icon, t.color, t.badge, t.onClick) }
             item(span = { GridItemSpan(3) }) {
                 Text(
-                    "Listings from TVmaze, epgshare01, GlobeTV EPG and more · times in your time zone",
+                    "Listings from TVmaze, epgshare01, epg.pw, GlobeTV EPG and more · times in your time zone",
                     color = Snap.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 12.dp),
                 )
             }

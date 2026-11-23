@@ -29,6 +29,7 @@ The guide merges every enabled source into one list and removes duplicates. You 
 |---|---|---|
 | Show listings with artwork and synopses | [TVmaze API](https://www.tvmaze.com/api) (CC BY-SA) | US, UK, CA, AU, most of Europe, JP, plus streaming services |
 | Channel-by-channel XMLTV guides | [epgshare01](https://epgshare01.online/epgshare01/) | About 70 countries, rebuilt daily. Includes India, the Gulf, Latin America and Southeast Asia, plus Plex, Peacock and DistroTV |
+| Per-country XMLTV guides | [epg.pw](https://epg.pw/xmltv.html) | 20 countries (AU, BR, CA, CN, DE, FR, GB, HK, ID, IN, JP, MY, NZ, PH, RU, SG, TW, US, VN, ZA), updated daily |
 | Per-country XMLTV guides | [GlobeTV EPG](https://github.com/globetvapp/epg) | Country folders on GitHub, updated daily |
 | Free streaming TV guides | [i.mjh.nz](https://github.com/matthuisman/i.mjh.nz) | Pluto TV, Samsung TV Plus, Plex and Roku, shown under 🌐 Streaming |
 | Your own guides | Any XMLTV URL (`.xml` / `.xml.gz`) | Show it for one country or for all of them |

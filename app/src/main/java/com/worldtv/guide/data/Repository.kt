@@ -101,6 +101,7 @@ class TvRepository(cacheDir: File) {
 
         launch {
             val feeds = resolve(SourceIds.EPGSHARE, "epgshare01") { resolver.epgshare(country) } +
+                resolve(SourceIds.EPGPW, "epg.pw") { resolver.epgPw(country) } +
                 resolve(SourceIds.GLOBETV, "GlobeTV") { resolver.globeTv(country) } +
                 resolve(SourceIds.FAST, "Free streaming TV") { resolver.fast(country) } +
                 resolver.custom(country, custom).filter { it.sourceId !in disabled }
