@@ -14,23 +14,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,31 +49,25 @@ import com.worldtv.guide.data.Country
 import com.worldtv.guide.data.FeedStatus
 import com.worldtv.guide.data.Prefs
 import com.worldtv.guide.ui.components.CountryPickerSheet
-import com.worldtv.guide.ui.components.SectionHeader
+import com.worldtv.guide.ui.components.SnapIcon
+import com.worldtv.guide.ui.components.SnapMenuRow
+import com.worldtv.guide.ui.components.SnapSection
+import com.worldtv.guide.ui.components.SnapTopBar
+import com.worldtv.guide.ui.theme.Snap
 import com.worldtv.guide.ui.guide.GuideViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs, onBack: () -> Unit) {
+fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs) {
     val guide by guideVm.state.collectAsStateWithLifecycle()
     val disabled by prefs.disabledSources.collectAsStateWithLifecycle()
     val custom by prefs.customSources.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Guide sources") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { adding = true }, icon = { Icon(Icons.Filled.Add, null) },
-                text = { Text("Add XMLTV guide") })
-        },
-    ) { pad ->
-        LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(bottom = 96.dp)) {
+    Column(Modifier.fillMaxSize().background(Snap.Canvas)) {
+        SnapTopBar("Guide sources", subtitle = "${guide.country.flag} ${guide.country.name}", badge = "⚙️")
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             item {
                 Text(
                     "Listings from every source that's switched on are merged into one guide, with duplicates removed.",
@@ -80,7 +75,7 @@ fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            item { SectionHeader("Built-in sources") }
+            item { SnapSection("Built-in sources") }
             items(BUILT_IN_SOURCES, key = { it.id }) { src ->
                 val feeds = guide.feeds.filter { it.sourceId == src.id }
                 SourceCard(
@@ -95,12 +90,18 @@ fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs, onBack: () -> Unit) {
                     },
                 )
             }
-            item { SectionHeader("Your XMLTV guides") }
+            item { SnapSection("Your XMLTV guides", "${custom.size}") }
+            item {
+                SnapMenuRow(
+                    title = "Add XMLTV guide…", subtitle = "Paste a .xml or .xml.gz guide link",
+                    leading = { SnapIcon(Icons.Filled.Add, Snap.AccentDeep) },
+                ) { adding = true }
+            }
             if (custom.isEmpty()) item {
                 Text(
                     "Add any XMLTV guide URL (.xml or .xml.gz), for example from your IPTV provider, " +
                         "open-epg.com or epg.pw. You can limit it to one country or show it everywhere.",
-                    Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium,
+                    Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -145,11 +146,18 @@ private fun SourceCard(
     title: String, body: String, status: String?, enabled: Boolean,
     onToggle: (Boolean) -> Unit, extra: @Composable () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+        colors = CardDefaults.cardColors(containerColor = Snap.Row),
+        shape = RoundedCornerShape(10.dp),
+    ) {
         Column(Modifier.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Switch(checked = enabled, onCheckedChange = onToggle)
+                Switch(
+                    checked = enabled, onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(checkedTrackColor = Snap.Accent, checkedThumbColor = Color.Black),
+                )
             }
             Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 4, overflow = TextOverflow.Ellipsis)

@@ -4,25 +4,26 @@ A worldwide TV guide app for Android, built with Kotlin and Jetpack Compose.
 
 ## Features
 
-- **TV Guide**: daily TV listings for any country, from yesterday through the next 6 days.
-  - You can pick any country, plus a **🌐 Streaming** schedule covering Netflix, Prime Video, Disney+ and others.
-  - Listings can be grouped by channel (with sticky headers) or sorted by time.
-  - **On now** shows a live badge and a progress bar. You can hide programmes that have ended, filter by genre, and search by show or channel.
-  - Air times are converted to your phone's time zone automatically.
-- **World Channels**: a directory of tens of thousands of TV channels from about 200 countries, with logos.
-  - You can browse by country (each country shows its channel count) and filter by category (News, Sports, Kids, Movies…).
-  - Search covers channel names, alternate names, networks and owners.
-  - Each channel has its own page with its network, owner, launch date and website. A **Find in TV guide** button opens that channel's listings.
-- **Programme details**: artwork, episode and show synopsis, genres and rating.
-  - **Remind me** adds the programme to your calendar, which sends a reminder before it starts.
-- **Favourites**: you can star channels and follow shows.
-  - The Favourites tab lists upcoming airings of the shows you follow.
-- Offline cache: the channel directory is cached for 24 hours and schedules for 30 minutes. If the network is down, the app shows the last data it downloaded.
-- Supports dark and light themes, with Material You colours on Android 12 and later. Needs Android 8.0 or later.
+The interface is styled after classic mobile portal apps. It has a home screen of glossy tiles, a gradient title bar with a live clock, and a soft-key bar along the bottom (**Options / Home** on the left, **Refresh** in the centre, **Back / Exit** on the right).
+
+- **Home tiles**
+  - **On Now**: everything airing right now, with a live count badge.
+  - **Tonight**: programmes from 6 pm onwards.
+  - **Full Guide**: yesterday through the next 6 days, grouped by channel or sorted by time, with genre filters.
+  - **Following**: upcoming airings of the shows you follow.
+  - **Search**: search all loaded listings.
+  - **Streaming**: schedules for Netflix, Prime Video, Disney+, Pluto TV, Samsung TV Plus and others.
+  - **Country**: choose any of about 200 countries.
+  - **Sources**: turn guide sources on or off, or add your own XMLTV links.
+  - **About**: credits for the data sources.
+- **Programme pages** show artwork, synopsis, genres, a live progress bar, **Remind me** (adds the programme to your calendar) and ☆ follow.
+- Air times are converted to your phone's time zone.
+- Downloaded listings are cached, so the app still shows the last data it downloaded when you're offline.
+- Needs Android 8.0 or later.
 
 ## Data sources (free, no API keys)
 
-The guide merges every enabled source into one list and removes duplicates. You can switch sources on or off, and add your own, from the **⚙ Sources** button in the TV Guide.
+The guide merges every enabled source into one list and removes duplicates. You can switch sources on or off, and add your own, from the **Sources** tile or the ⚙ button in any guide view.
 
 | What | Source | Coverage |
 |---|---|---|
@@ -31,7 +32,7 @@ The guide merges every enabled source into one list and removes duplicates. You 
 | Per-country XMLTV guides | [GlobeTV EPG](https://github.com/globetvapp/epg) | Country folders on GitHub, updated daily |
 | Free streaming TV guides | [i.mjh.nz](https://github.com/matthuisman/i.mjh.nz) | Pluto TV, Samsung TV Plus, Plex and Roku, shown under 🌐 Streaming |
 | Your own guides | Any XMLTV URL (`.xml` / `.xml.gz`) | Show it for one country or for all of them |
-| Worldwide channels, countries, categories, logos | [iptv-org/api](https://github.com/iptv-org/api) (public domain) | About 200 countries |
+| Country list and flags | [iptv-org/api](https://github.com/iptv-org/api) (public domain) | About 200 countries |
 
 XMLTV files are streamed and parsed on the device, and only the selected day is kept in memory. Downloaded guide files are cached for 6 hours, and the cache is capped at about 300 MB. Some country files are several MB, so the first load of a country on mobile data takes a moment.
 

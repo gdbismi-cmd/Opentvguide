@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Star
@@ -35,7 +34,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.worldtv.guide.ui.components.SnapTopBar
+import com.worldtv.guide.ui.theme.Snap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,7 +70,7 @@ import com.worldtv.guide.util.stripHtml
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs, onBack: () -> Unit) {
+fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs) {
     var ep by remember { mutableStateOf<TmEpisode?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
@@ -84,16 +84,16 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs, onBack: () -
     val show = e?.theShow
     val isFav = show != null && favShows.any { it.key == "tm:${show.id}" }
 
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text(show?.name ?: "Programme", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+    Column(Modifier.fillMaxSize().background(Snap.Canvas)) {
+        SnapTopBar(
+            title = show?.name ?: "Programme",
+            subtitle = e?.channel?.name,
             actions = {
                 if (show != null) IconButton(onClick = {
                     prefs.toggleShow(FavShow("tm:${show.id}", show.name, show.image?.medium))
                 }) {
                     Icon(if (isFav) Icons.Filled.Star else Icons.Filled.StarBorder, "Favourite show",
-                        tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        tint = if (isFav) Snap.Accent else Snap.Text)
                 }
             },
         )

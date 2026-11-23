@@ -12,13 +12,10 @@ import java.util.UUID
 /** A followed show. [key] is "tm:<tvmaze id>" or "t:<normalised title>" (see [Programme.favKey]). */
 data class FavShow(val key: String, val name: String, val image: String?)
 
-/** Favourites, source settings and other preferences, persisted in SharedPreferences. */
+/** Followed shows, source settings and other preferences, persisted in SharedPreferences. */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("worldtv", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
-
-    private val _favChannels = MutableStateFlow(sp.getStringSet(KEY_CH, emptySet())!!.toSet())
-    val favChannels: StateFlow<Set<String>> = _favChannels.asStateFlow()
 
     private val _favShows = MutableStateFlow(decodeShows(sp.getStringSet(KEY_SH, emptySet())!!))
     val favShows: StateFlow<List<FavShow>> = _favShows.asStateFlow()
@@ -35,17 +32,6 @@ class Prefs(context: Context) {
     var guideCountry: String
         get() = sp.getString(KEY_COUNTRY, null) ?: defaultCountry()
         set(v) { sp.edit().putString(KEY_COUNTRY, v).apply() }
-
-    var channelsCountry: String?
-        get() = sp.getString(KEY_CH_COUNTRY, null)
-        set(v) { sp.edit().putString(KEY_CH_COUNTRY, v).apply() }
-
-    fun toggleChannel(id: String) {
-        val s = _favChannels.value.toMutableSet()
-        if (!s.add(id)) s.remove(id)
-        _favChannels.value = s
-        sp.edit().putStringSet(KEY_CH, s).apply()
-    }
 
     fun isFollowing(key: String) = _favShows.value.any { it.key == key }
 
@@ -97,10 +83,8 @@ class Prefs(context: Context) {
     }
 
     companion object {
-        private const val KEY_CH = "fav_channels"
         private const val KEY_SH = "fav_shows"
         private const val KEY_COUNTRY = "guide_country"
-        private const val KEY_CH_COUNTRY = "channels_country"
         private const val KEY_DISABLED = "disabled_sources"
         private const val KEY_CUSTOM = "custom_sources"
     }

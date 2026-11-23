@@ -6,19 +6,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,30 +25,23 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.worldtv.guide.ui.channels.ChannelDetailScreen
-import com.worldtv.guide.ui.channels.ChannelsScreen
-import com.worldtv.guide.ui.channels.ChannelsViewModel
 import com.worldtv.guide.data.Programme
+import com.worldtv.guide.ui.components.SoftKeyBar
+import com.worldtv.guide.ui.country.CountryScreen
 import com.worldtv.guide.ui.detail.EpisodeDetailScreen
 import com.worldtv.guide.ui.detail.ProgrammeDetailScreen
-import com.worldtv.guide.ui.sources.SourcesScreen
 import com.worldtv.guide.ui.favorites.FavoritesScreen
+import com.worldtv.guide.ui.guide.GuideMode
 import com.worldtv.guide.ui.guide.GuideScreen
 import com.worldtv.guide.ui.guide.GuideViewModel
+import com.worldtv.guide.ui.home.HomeScreen
+import com.worldtv.guide.ui.sources.SourcesScreen
+import com.worldtv.guide.ui.theme.Snap
 import com.worldtv.guide.ui.theme.WorldTvTheme
-
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
-
-private val tabs = listOf(
-    Tab("guide", "TV Guide", Icons.Filled.LiveTv),
-    Tab("channels", "Channels", Icons.Filled.Public),
-    Tab("favorites", "Favourites", Icons.Filled.Favorite),
-)
 
 class MainActivity : ComponentActivity() {
 
     private val guideVm: GuideViewModel by viewModels { GuideViewModel.factory(application as WorldTvApp) }
-    private val channelsVm: ChannelsViewModel by viewModels { ChannelsViewModel.factory(application as WorldTvApp) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,85 +51,72 @@ class MainActivity : ComponentActivity() {
             WorldTvTheme {
                 val nav = rememberNavController()
                 val backStack by nav.currentBackStackEntryAsState()
-                val current = backStack?.destination?.route
-                fun goTab(route: String) = nav.navigate(route) {
-                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true
-                    restoreState = true
-                }
+                val route = backStack?.destination?.route.orEmpty()
+                val atHome = route == "home"
+
+                fun goHome() { nav.popBackStack(nav.graph.findStartDestination().id, inclusive = false) }
+                fun openGuide(mode: GuideMode) = nav.navigate("guide/${mode.name}") { launchSingleTop = true }
                 fun openProgramme(p: Programme) {
                     val ep = p.tvmazeEpisodeId
                     if (ep != null) nav.navigate("episode/$ep") else nav.navigate("programme/${Uri.encode(p.id)}")
                 }
 
-                Scaffold(
-                    bottomBar = {
-                        if (tabs.any { it.route == current }) {
-                            NavigationBar {
-                                tabs.forEach { t ->
-                                    NavigationBarItem(
-                                        selected = current == t.route,
-                                        onClick = { goTab(t.route) },
-                                        icon = { Icon(t.icon, null) },
-                                        label = { Text(t.label) },
-                                    )
-                                }
+                Column(Modifier.fillMaxSize().background(Snap.Canvas).windowInsetsPadding(WindowInsets.ime)) {
+                    Box(Modifier.weight(1f)) {
+                        NavHost(nav, startDestination = "home") {
+                            composable("home") {
+                                HomeScreen(
+                                    guideVm, app.prefs,
+                                    onGuide = ::openGuide,
+                                    onFollowing = { nav.navigate("following") },
+                                    onCountry = { nav.navigate("country") },
+                                    onSources = { nav.navigate("sources") },
+                                )
+                            }
+                            composable(
+                                "guide/{mode}",
+                                arguments = listOf(navArgument("mode") { type = NavType.StringType }),
+                            ) { entry ->
+                                val mode = runCatching { GuideMode.valueOf(entry.arguments?.getString("mode").orEmpty()) }
+                                    .getOrDefault(GuideMode.ALL)
+                                GuideScreen(
+                                    guideVm, app.prefs, mode,
+                                    onProgramme = ::openProgramme,
+                                    onSources = { nav.navigate("sources") },
+                                    onCountry = { nav.navigate("country") },
+                                )
+                            }
+                            composable("following") {
+                                FavoritesScreen(
+                                    guideVm, app.prefs,
+                                    onProgramme = ::openProgramme,
+                                    onShowInGuide = { name -> guideVm.setQuery(name); openGuide(GuideMode.SEARCH) },
+                                )
+                            }
+                            composable("country") { CountryScreen(guideVm, onPicked = { nav.popBackStack() }) }
+                            composable("sources") { SourcesScreen(guideVm, app.prefs) }
+                            composable(
+                                "programme/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                            ) { entry ->
+                                ProgrammeDetailScreen(Uri.decode(entry.arguments?.getString("id").orEmpty()), app.repo, app.prefs)
+                            }
+                            composable(
+                                "episode/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.LongType }),
+                            ) { entry ->
+                                EpisodeDetailScreen(entry.arguments?.getLong("id") ?: 0L, app.repo, app.prefs)
                             }
                         }
-                    },
-                ) { pad ->
-                    NavHost(nav, startDestination = "guide", modifier = Modifier.padding(bottom = pad.calculateBottomPadding())) {
-                        composable("guide") {
-                            GuideScreen(guideVm, app.prefs, onProgramme = ::openProgramme, onSources = { nav.navigate("sources") })
-                        }
-                        composable("sources") {
-                            SourcesScreen(guideVm, app.prefs, onBack = { nav.popBackStack() })
-                        }
-                        composable(
-                            "programme/{id}",
-                            arguments = listOf(navArgument("id") { type = NavType.StringType }),
-                        ) { entry ->
-                            ProgrammeDetailScreen(
-                                id = Uri.decode(entry.arguments?.getString("id").orEmpty()),
-                                repo = app.repo, prefs = app.prefs, onBack = { nav.popBackStack() },
-                            )
-                        }
-                        composable("channels") {
-                            ChannelsScreen(channelsVm, app.prefs, onChannel = { nav.navigate("channel/$it") })
-                        }
-                        composable("favorites") {
-                            FavoritesScreen(
-                                guideVm, channelsVm, app.prefs,
-                                onChannel = { nav.navigate("channel/$it") },
-                                onProgramme = ::openProgramme,
-                                onShowInGuide = { name -> guideVm.setQuery(name); goTab("guide") },
-                            )
-                        }
-                        composable(
-                            "channel/{id}",
-                            arguments = listOf(navArgument("id") { type = NavType.StringType }),
-                        ) { entry ->
-                            ChannelDetailScreen(
-                                id = entry.arguments?.getString("id").orEmpty(),
-                                vm = channelsVm, prefs = app.prefs,
-                                onBack = { nav.popBackStack() },
-                                onFindInGuide = { countryCode, name ->
-                                    guideVm.openFromChannel(countryCode, name)
-                                    goTab("guide")
-                                },
-                            )
-                        }
-                        composable(
-                            "episode/{id}",
-                            arguments = listOf(navArgument("id") { type = NavType.LongType }),
-                        ) { entry ->
-                            EpisodeDetailScreen(
-                                id = entry.arguments?.getLong("id") ?: 0L,
-                                repo = app.repo, prefs = app.prefs,
-                                onBack = { nav.popBackStack() },
-                            )
-                        }
                     }
+                    SoftKeyBar(
+                        left = if (atHome) "Options" else "Home",
+                        onLeft = { if (atHome) nav.navigate("sources") else goHome() },
+                        right = if (atHome) "Exit" else "Back",
+                        onRight = { if (atHome) finish() else nav.popBackStack() },
+                        center = if (atHome || route.startsWith("guide")) Icons.Filled.Refresh else Icons.Filled.Home,
+                        onCenter = { if (atHome || route.startsWith("guide")) guideVm.load(force = true) else goHome() },
+                    )
                 }
             }
         }

@@ -65,32 +65,7 @@ data class TmEpisode(
     val channelName: String get() = channel?.name ?: "Unknown channel"
 }
 
-// ---------- iptv-org (worldwide channel directory) ----------
-
-@Serializable
-data class IptvChannel(
-    val id: String,
-    val name: String,
-    @SerialName("alt_names") val altNames: List<String> = emptyList(),
-    val network: String? = null,
-    val owners: List<String> = emptyList(),
-    val country: String = "",
-    val city: String? = null,
-    val categories: List<String> = emptyList(),
-    @SerialName("is_nsfw") val isNsfw: Boolean = false,
-    val launched: String? = null,
-    val closed: String? = null,
-    val website: String? = null,
-    // Older versions of the dataset carried the logo inline.
-    val logo: String? = null,
-)
-
-@Serializable
-data class IptvLogo(
-    val channel: String,
-    val feed: String? = null,
-    val url: String,
-)
+// ---------- iptv-org (country list) ----------
 
 @Serializable
 data class IptvCountry(
@@ -100,24 +75,8 @@ data class IptvCountry(
     val flag: String = "",
 )
 
-@Serializable
-data class IptvCategory(val id: String, val name: String)
 
 // ---------- App models ----------
-
-data class Channel(
-    val id: String,
-    val name: String,
-    val altNames: List<String>,
-    val network: String?,
-    val owners: List<String>,
-    val countryCode: String,
-    val city: String?,
-    val categories: List<String>,
-    val launched: String?,
-    val website: String?,
-    val logo: String?,
-)
 
 data class Country(val code: String, val name: String, val flag: String) {
     /** iptv-org uses "UK"; TVmaze (and ISO 3166) use "GB". */

@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -33,7 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.worldtv.guide.ui.components.SnapTopBar
+import com.worldtv.guide.ui.theme.Snap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,20 +58,20 @@ import java.time.Instant
 /** Detail page for a programme that came from an XMLTV guide. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ProgrammeDetailScreen(id: String, repo: TvRepository, prefs: Prefs, onBack: () -> Unit) {
+fun ProgrammeDetailScreen(id: String, repo: TvRepository, prefs: Prefs) {
     val p = repo.programme(id)
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val following = p != null && favShows.any { it.key == p.favKey }
 
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text(p?.title ?: "Programme", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+    Column(Modifier.fillMaxSize().background(Snap.Canvas)) {
+        SnapTopBar(
+            title = p?.title ?: "Programme",
+            subtitle = p?.channelName,
             actions = {
                 if (p != null) IconButton(onClick = { prefs.toggleShow(FavShow(p.favKey, p.title, p.image)) }) {
                     Icon(if (following) Icons.Filled.Star else Icons.Filled.StarBorder, "Follow show",
-                        tint = if (following) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        tint = if (following) Snap.Accent else Snap.Text)
                 }
             },
         )
