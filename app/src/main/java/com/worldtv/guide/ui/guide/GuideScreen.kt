@@ -48,6 +48,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -190,6 +194,7 @@ fun GuideScreen(
                 }
                 item { Pill(if (s.byChannel) "By channel" else "By time", true, vm::toggleGrouping) }
             }
+            if (!useGrid) item { Pill("📝 Descriptions", s.showDescriptions, vm::toggleDescriptions) }
             if (mode != GuideMode.SEARCH && languageCounts.size > 1) {
                 item { Pill("🗣 By language", s.byLanguage, vm::toggleByLanguage) }
             }
@@ -250,7 +255,7 @@ fun GuideScreen(
                         }
                         stickyHeader(key = "h_$gi$channel") { ChannelHeader(channel, logo, list.size) }
                         itemsIndexed(list, key = { _, p -> "g${gi}_${p.id}" }) { i, p ->
-                            ProgrammeRow(p, now, showChannel = false, fav = p.favKey in favKeys, index = i) { onProgramme(p) }
+                            ProgrammeRow(p, now, showChannel = false, fav = p.favKey in favKeys, index = i, showDescription = s.showDescriptions) { onProgramme(p) }
                         }
                     }
                 }
@@ -258,7 +263,7 @@ fun GuideScreen(
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
                 item { Count(filtered.size, filtered.map { it.channelKey }.distinct().size) }
                 itemsIndexed(filtered, key = { _, p -> p.id }) { i, p ->
-                    ProgrammeRow(p, now, showChannel = true, fav = p.favKey in favKeys, index = i) { onProgramme(p) }
+                    ProgrammeRow(p, now, showChannel = true, fav = p.favKey in favKeys, index = i, showDescription = s.showDescriptions) { onProgramme(p) }
                 }
             }
         }
@@ -389,74 +394,90 @@ private fun DateStrip(selected: LocalDate, onPick: (LocalDate) -> Unit) {
 @Composable
 private fun ChannelHeader(name: String, logo: String?, count: Int) {
     Row(
-        Modifier.fillMaxWidth().background(Snap.section).padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().background(Snap.section).padding(horizontal = 10.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well),
+        Box(Modifier.size(24.dp).clip(RoundedCornerShape(5.dp)).background(Snap.Well),
             contentAlignment = Alignment.Center) {
-            Text(name.take(2).uppercase(), color = Snap.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(name.take(2).uppercase(), color = Snap.Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             if (logo != null) AsyncImage(logo, null, Modifier.fillMaxSize().padding(2.dp), contentScale = ContentScale.Fit)
         }
-        Spacer(Modifier.width(10.dp))
-        Text(name, Modifier.weight(1f), color = Snap.SectionText, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-            lineHeight = 17.sp)
+        Spacer(Modifier.width(8.dp))
+        Text(name, Modifier.weight(1f), color = Snap.SectionText, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+            lineHeight = 15.sp)
         Text("$count", color = Snap.SectionText.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
 
+/**
+ * Compact guide row, the same height as a grid row (about 44 dp) when descriptions are off:
+ * time, small artwork, title, and one line with channel · episode · genre.
+ */
 @Composable
-fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean, index: Int = 0, onClick: () -> Unit) {
+fun ProgrammeRow(
+    p: Programme, now: Instant, showChannel: Boolean, fav: Boolean, index: Int = 0,
+    showDescription: Boolean = true, onClick: () -> Unit,
+) {
     val live = p.isOnNow(now)
     val ended = p.hasEnded(now)
-    Row(
+    Box(
         Modifier.fillMaxWidth()
             .background(if (live) Snap.LiveRow else if (index % 2 == 0) Snap.Row else Snap.RowAlt)
-            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(onClick = onClick),
     ) {
-        Column(Modifier.width(58.dp)) {
-            Text(p.start.localTime(), fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                color = if (live) Snap.Accent else if (ended) Snap.Muted else Snap.Text)
-            if (live) Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(6.dp).clip(CircleShape).background(Snap.Live))
-                Spacer(Modifier.width(3.dp))
-                Text("LIVE", fontSize = 10.sp, color = Snap.Live, fontWeight = FontWeight.Bold)
-            }
-        }
-        val img = p.image ?: p.channelLogo.takeIf { showChannel }
-        if (img != null) {
-            Box(Modifier.size(width = 40.dp, height = 40.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well)) {
-                AsyncImage(img, null, Modifier.fillMaxSize(),
-                    contentScale = if (p.image != null) ContentScale.Crop else ContentScale.Fit)
-            }
-            Spacer(Modifier.width(10.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (fav) {
-                    Icon(Icons.Filled.Star, "Following", Modifier.size(14.dp), tint = Snap.Accent)
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = 10.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.width(50.dp)) {
+                Text(p.start.localTime(), fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold,
+                    color = if (live) Snap.Accent else if (ended) Snap.Muted else Snap.Text)
+                if (live) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(Snap.Live))
                     Spacer(Modifier.width(3.dp))
+                    Text("LIVE", fontSize = 9.sp, lineHeight = 10.sp, color = Snap.Live, fontWeight = FontWeight.Bold)
                 }
-                Text(p.title, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                    color = if (ended) Snap.Muted else Snap.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (showChannel) Text(p.channelName, fontSize = 12.sp, lineHeight = 15.sp, color = Snap.Accent,
-                fontWeight = FontWeight.Bold)
-            val sub = listOfNotNull(p.subtitle, p.genres.firstOrNull()).joinToString(" · ")
-            if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = Snap.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            // Short description preview; the full text is on the programme page.
-            p.description?.takeIf { it.isNotBlank() }?.let { d ->
-                Text(d, fontSize = 12.sp, lineHeight = 15.sp, color = Snap.Text.copy(alpha = 0.72f),
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            val img = p.image ?: p.channelLogo.takeIf { showChannel }
+            if (img != null) {
+                Box(Modifier.size(32.dp).clip(RoundedCornerShape(5.dp)).background(Snap.Well)) {
+                    AsyncImage(img, null, Modifier.fillMaxSize(),
+                        contentScale = if (p.image != null) ContentScale.Crop else ContentScale.Fit)
+                }
+                Spacer(Modifier.width(8.dp))
             }
-            if (live) {
-                Spacer(Modifier.height(5.dp))
-                LinearProgressIndicator(
-                    progress = { p.progress(now) }, modifier = Modifier.fillMaxWidth().height(3.dp),
-                    color = Snap.Accent, trackColor = Snap.Line,
-                )
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (fav) {
+                        Icon(Icons.Filled.Star, "Following", Modifier.size(12.dp), tint = Snap.Accent)
+                        Spacer(Modifier.width(3.dp))
+                    }
+                    Text(p.title, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold,
+                        color = if (ended) Snap.Muted else Snap.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                // Channel name first and in full (it may wrap); episode and genre after it.
+                val rest = listOfNotNull(p.subtitle, p.genres.firstOrNull()).joinToString(" · ")
+                val line = buildAnnotatedString {
+                    if (showChannel) {
+                        withStyle(SpanStyle(color = Snap.Accent, fontWeight = FontWeight.Bold)) { append(p.channelName) }
+                        if (rest.isNotBlank()) append("  ·  ")
+                    }
+                    append(rest)
+                }
+                if (line.isNotBlank()) Text(line, fontSize = 11.sp, lineHeight = 13.sp, color = Snap.Muted,
+                    maxLines = if (showChannel) 2 else 1, overflow = TextOverflow.Ellipsis)
+                if (showDescription) p.description?.takeIf { it.isNotBlank() }?.let { d ->
+                    Text(d, fontSize = 11.sp, lineHeight = 14.sp, color = Snap.Text.copy(alpha = 0.72f),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp, bottom = 2.dp))
+                }
             }
         }
+        // Thin progress line along the bottom edge instead of an extra row.
+        if (live) LinearProgressIndicator(
+            progress = { p.progress(now) },
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp),
+            color = Snap.Accent, trackColor = Color.Transparent,
+        )
     }
 }
 

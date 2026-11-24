@@ -33,6 +33,10 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_THEME, null)
         set(v) { sp.edit().putString(KEY_THEME, v).apply() }
 
+    var showDescriptions: Boolean
+        get() = sp.getBoolean(KEY_DESC, true)
+        set(v) { sp.edit().putBoolean(KEY_DESC, v).apply() }
+
     /** "list" or "grid". */
     var guideView: String
         get() = sp.getString(KEY_VIEW, "list") ?: "list"
@@ -96,6 +100,7 @@ class Prefs(context: Context) {
         private const val KEY_COUNTRY = "guide_country"
         private const val KEY_THEME = "theme"
         private const val KEY_VIEW = "guide_view"
+        private const val KEY_DESC = "show_descriptions"
         private const val KEY_DISABLED = "disabled_sources"
         private const val KEY_CUSTOM = "custom_sources"
     }

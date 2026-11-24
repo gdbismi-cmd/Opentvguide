@@ -39,6 +39,7 @@ data class GuideState(
     val hideEnded: Boolean = true,
     val byChannel: Boolean = true,
     val grid: Boolean = false,
+    val showDescriptions: Boolean = true,
     /** Group/sort channels by language (on by default for India). */
     val byLanguage: Boolean = false,
     val language: String? = null,
@@ -50,7 +51,7 @@ data class GuideState(
 
 class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) : ViewModel() {
 
-    private val _state = MutableStateFlow(GuideState(grid = prefs.guideView == "grid"))
+    private val _state = MutableStateFlow(GuideState(grid = prefs.guideView == "grid", showDescriptions = prefs.showDescriptions))
     val state: StateFlow<GuideState> = _state.asStateFlow()
     private var loadJob: Job? = null
     @Volatile private var logoIndex: LogoIndex? = null
@@ -182,6 +183,11 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
         _state.update { it.copy(grid = grid) }
     }
     fun setGenre(g: String?) = _state.update { it.copy(genre = g) }
+    fun toggleDescriptions() {
+        val v = !_state.value.showDescriptions
+        prefs.showDescriptions = v
+        _state.update { it.copy(showDescriptions = v) }
+    }
     fun toggleByLanguage() = _state.update { it.copy(byLanguage = !it.byLanguage, language = null) }
     fun setLanguage(l: String?) = _state.update { it.copy(language = l) }
 

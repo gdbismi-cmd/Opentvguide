@@ -63,7 +63,7 @@ fun FavoritesScreen(
                 Text("None of your shows air here on this day.", Modifier.padding(12.dp), color = Snap.Muted, fontSize = 13.sp)
             }
             itemsIndexed(upcoming, key = { _, p -> "u${p.id}" }) { i, p ->
-                ProgrammeRow(p, now, showChannel = true, fav = true, index = i) { onProgramme(p) }
+                ProgrammeRow(p, now, showChannel = true, fav = true, index = i, showDescription = guide.showDescriptions) { onProgramme(p) }
             }
             item { SnapSection("Shows you follow", "${favShows.size}") }
             itemsIndexed(favShows, key = { _, f -> "s${f.key}" }) { i, f ->
