@@ -31,6 +31,11 @@ data class Palette(
     val text: Color, val muted: Color,
     val ok: Color = Color(0xFF7CD992), val bad: Color = Color(0xFFFF6B6B),
     val live: Color = Color(0xFFFF4040),
+    val description: String = "",
+    /** Glass look: bars get a bright upper half and a darker lower half. */
+    val gloss: Boolean = false,
+    /** Centre soft key ("start button"); defaults to the accent colours. */
+    val centerTop: Color? = null, val centerBottom: Color? = null, val onCenter: Color? = null,
 )
 
 object Palettes {
@@ -95,7 +100,54 @@ object Palettes {
         text = Color(0xFFFBEFFA), muted = Color(0xFFB79CB5),
     )
 
-    val all = listOf(Classic, Light, Ocean, Lime, Berry)
+    /** Luna blue: bright blue title bar, blue taskbar, green start button, beige windows. */
+    val WinXp = Palette(
+        "winxp", "Windows XP", light = true,
+        canvas = Color(0xFFECE9D8), row = Color(0xFFFFFFFF), rowAlt = Color(0xFFF6F5EF), line = Color(0xFFACA899),
+        well = Color(0xFFE3E0D1), liveRow = Color(0xFFFFF4C9), selected = Color(0xFFC1D2EE),
+        barTop = Color(0xFF3D95FF), barBottom = Color(0xFF0040C8), barText = Color.White, barMuted = Color(0xFFD9E7FF),
+        keyTop = Color(0xFF3F7BE6), keyBottom = Color(0xFF1C47A8), keyText = Color.White,
+        sectionTop = Color(0xFFFFFFFF), sectionBottom = Color(0xFFC6D3F7), sectionText = Color(0xFF215DC6),
+        accent = Color(0xFF3A9B2E), accentDeep = Color(0xFF2A7A20), onAccent = Color.White,
+        text = Color(0xFF1B1B1B), muted = Color(0xFF6D6D6D),
+        ok = Color(0xFF2E8B22), bad = Color(0xFFC62828), live = Color(0xFFE0301E),
+        description = "Luna blue title bar and taskbar, green start key, beige windows",
+        gloss = true,
+        centerTop = Color(0xFF5CC24A), centerBottom = Color(0xFF2E8A23), onCenter = Color.White,
+    )
+
+    /** Aero black glass with a glowing blue orb. */
+    val WinVista = Palette(
+        "winvista", "Windows Vista", light = false,
+        canvas = Color(0xFF0F1318), row = Color(0xFF1A1F26), rowAlt = Color(0xFF161A20), line = Color(0xFF2C343E),
+        well = Color(0xFF0B0E12), liveRow = Color(0xFF143140), selected = Color(0xFF1E4A68),
+        barTop = Color(0xFF59646F), barBottom = Color(0xFF0A0D11), barText = Color.White, barMuted = Color(0xFFBAC7D3),
+        keyTop = Color(0xFF454F5A), keyBottom = Color(0xFF040506), keyText = Color.White,
+        sectionTop = Color(0xFF2C3642), sectionBottom = Color(0xFF161B21), sectionText = Color(0xFFE8EFF6),
+        accent = Color(0xFF38B6EC), accentDeep = Color(0xFF1270B5), onAccent = Color.White,
+        text = Color(0xFFEEF3F7), muted = Color(0xFF9CA9B5),
+        description = "Aero black glass bars, glowing blue orb, dark windows",
+        gloss = true,
+        centerTop = Color(0xFF7FD4FF), centerBottom = Color(0xFF0A5AA6), onCenter = Color.White,
+    )
+
+    /** Aero blue glass title bar, dark glass taskbar, bright white windows. */
+    val Win7 = Palette(
+        "win7", "Windows 7", light = true,
+        canvas = Color(0xFFEEF3F9), row = Color(0xFFFFFFFF), rowAlt = Color(0xFFF5F8FC), line = Color(0xFFD5DFE9),
+        well = Color(0xFFE2E9F2), liveRow = Color(0xFFFFF3D3), selected = Color(0xFFCCE8FF),
+        barTop = Color(0xFF8DB6DE), barBottom = Color(0xFF2E5F90), barText = Color.White, barMuted = Color(0xFFE2EEF9),
+        keyTop = Color(0xFF4A6886), keyBottom = Color(0xFF122436), keyText = Color.White,
+        sectionTop = Color(0xFFEDF4FC), sectionBottom = Color(0xFFD3E3F4), sectionText = Color(0xFF1E3B5A),
+        accent = Color(0xFF3399FF), accentDeep = Color(0xFF1A6CD0), onAccent = Color.White,
+        text = Color(0xFF1A1A1A), muted = Color(0xFF5F6B78),
+        ok = Color(0xFF1E8E3E), bad = Color(0xFFD32F2F), live = Color(0xFFE53935),
+        description = "Aero blue glass title bar, dark glass taskbar, white windows",
+        gloss = true,
+        centerTop = Color(0xFF6CC0FF), centerBottom = Color(0xFF1659B0), onCenter = Color.White,
+    )
+
+    val all = listOf(Classic, Light, Ocean, Lime, Berry, WinXp, WinVista, Win7)
     fun byId(id: String?) = all.firstOrNull { it.id == id } ?: Classic
 }
 
@@ -126,8 +178,25 @@ object Snap {
     val KeyText get() = palette.keyText
     val SectionText get() = palette.sectionText
 
-    val bar: Brush get() = Brush.verticalGradient(listOf(palette.barTop, palette.barBottom))
-    val softKeys: Brush get() = Brush.verticalGradient(listOf(palette.keyTop, palette.keyBottom))
+    val OnCenter get() = palette.onCenter ?: palette.onAccent
+
+    val bar: Brush get() = glass(palette.barTop, palette.barBottom)
+    val softKeys: Brush get() = glass(palette.keyTop, palette.keyBottom)
+    val centerKey: Brush get() = glass(palette.centerTop ?: palette.accent, palette.centerBottom ?: palette.accentDeep)
+
+    /** Plain gradient, or for glass skins a bright upper half that breaks into a darker lower half. */
+    private fun glass(top: Color, bottom: Color): Brush =
+        if (!palette.gloss) Brush.verticalGradient(listOf(top, bottom))
+        else Brush.verticalGradient(
+            0f to mix(top, Color.White, 0.35f),
+            0.48f to top,
+            0.5f to mix(top, bottom, 0.65f),
+            1f to bottom,
+        )
+
+    private fun mix(a: Color, b: Color, t: Float) = Color(
+        a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t, 1f,
+    )
     val section: Brush get() = Brush.verticalGradient(listOf(palette.sectionTop, palette.sectionBottom))
     val accentBar: Brush get() = Brush.verticalGradient(listOf(palette.accent, palette.accentDeep))
 }

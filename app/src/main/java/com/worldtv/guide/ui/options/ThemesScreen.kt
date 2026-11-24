@@ -45,11 +45,14 @@ fun ThemesScreen(prefs: Prefs) {
     Column(Modifier.fillMaxSize().background(Snap.Canvas)) {
         SnapTopBar("Themes", subtitle = current.name, badge = "🎨")
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-            item { SnapSection("Choose a skin", "${Palettes.all.size}") }
-            items(Palettes.all, key = { it.id }) { p ->
-                ThemeCard(p, selected = p.id == current.id) {
-                    Snap.palette = p
-                    prefs.themeId = p.id
+            val (windows, snaptu) = Palettes.all.partition { it.id.startsWith("win") }
+            listOf("Snaptu" to snaptu, "Windows" to windows).forEach { (title, group) ->
+                item(key = "h_$title") { SnapSection(title, "${group.size}") }
+                items(group, key = { it.id }) { p ->
+                    ThemeCard(p, selected = p.id == current.id) {
+                        Snap.palette = p
+                        prefs.themeId = p.id
+                    }
                 }
             }
         }
@@ -70,7 +73,8 @@ private fun ThemeCard(p: Palette, selected: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, color = Snap.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(if (p.light) "Light lists, blue title bar" else "Dark lists, glossy tiles", color = Snap.Muted, fontSize = 12.sp)
+            Text(p.description.ifBlank { if (p.light) "Light lists, blue title bar" else "Dark lists, glossy tiles" },
+                color = Snap.Muted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(p.barTop, p.accent, p.row, p.canvas).forEach { c ->
@@ -108,6 +112,10 @@ private fun MiniPhone(p: Palette) {
             Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(2.dp)).background(p.row))
             Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(2.dp)).background(p.rowAlt))
         }
-        Box(Modifier.fillMaxWidth().height(12.dp).background(Brush.verticalGradient(listOf(p.keyTop, p.keyBottom))))
+        Box(Modifier.fillMaxWidth().height(12.dp).background(Brush.verticalGradient(listOf(p.keyTop, p.keyBottom))),
+            contentAlignment = Alignment.Center) {
+            Box(Modifier.size(width = 16.dp, height = 8.dp).clip(RoundedCornerShape(4.dp)).background(
+                Brush.verticalGradient(listOf(p.centerTop ?: p.accent, p.centerBottom ?: p.accentDeep))))
+        }
     }
 }

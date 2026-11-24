@@ -110,9 +110,9 @@ fun SoftKeyBar(
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (center != null) Box(
                     Modifier.size(width = 56.dp, height = 34.dp).clip(RoundedCornerShape(17.dp))
-                        .background(Snap.accentBar).clickable(onClick = onCenter),
+                        .background(Snap.centerKey).clickable(onClick = onCenter),
                     contentAlignment = Alignment.Center,
-                ) { Icon(center, null, tint = Snap.OnAccent, modifier = Modifier.size(20.dp)) }
+                ) { Icon(center, null, tint = Snap.OnCenter, modifier = Modifier.size(20.dp)) }
             }
             SoftKey(right, Modifier.weight(1f), TextAlign.End, onRight)
         }

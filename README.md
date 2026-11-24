@@ -15,7 +15,7 @@ The interface is styled after classic mobile portal apps. It has a home screen o
   - **Streaming**: schedules for Netflix, Prime Video, Disney+, Pluto TV, Samsung TV Plus and others.
   - **Country**: choose any of about 200 countries.
   - **Sources**: turn guide sources on or off, or add your own XMLTV links.
-  - **Themes**: choose one of five Snaptu-style skins (Classic, Light, Ocean, Lime, Berry). The change applies instantly and is remembered.
+  - **Themes**: five Snaptu-style skins (Classic, Light, Ocean, Lime, Berry) and three Windows skins (XP Luna, Vista Aero black glass, 7 Aero blue glass) with glossy bars and a start-button centre key. The change applies instantly and is remembered.
 - The **Options** soft key opens a menu with Themes, Country, Guide sources, Refresh and About.
 - **List or Grid view**: switch any guide screen between **☰ List** and **▦ Grid**. Grid view is a classic TV-guide grid, with channels pinned down the left, a half-hour time ruler across the top, programme blocks sized by length, and a red line marking now. **Jump to now** scrolls the grid back to the current time. The app remembers which view you chose.
 - **Programme pages** show artwork, synopsis, genres, a live progress bar, **Remind me** (adds the programme to your calendar) and ☆ follow.
