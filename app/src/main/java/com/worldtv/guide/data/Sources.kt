@@ -39,7 +39,10 @@ val BUILT_IN_SOURCES = listOf(
 data class CustomSource(val id: String, val name: String, val url: String, val country: String? = null)
 
 /** One downloadable guide file for the current country. */
-data class Feed(val sourceId: String, val sourceName: String, val label: String, val url: String)
+data class Feed(
+    val sourceId: String, val sourceName: String, val label: String, val url: String,
+    val fallbacks: List<String> = emptyList(),
+)
 
 /** Works out which guide files exist for a country, from each source's public listings. */
 class FeedResolver(private val http: CachedHttp, private val json: Json) {
@@ -74,7 +77,8 @@ class FeedResolver(private val http: CachedHttp, private val json: Json) {
         }.getOrNull() ?: EPGPW_FALLBACK
         val cc = country.isoCode
         if (cc !in codes) return emptyList()
-        return listOf(Feed(SourceIds.EPGPW, "epg.pw", cc, "https://epg.pw/xmltv/epg_$cc.xml.gz"))
+        return listOf(Feed(SourceIds.EPGPW, "epg.pw", cc, "https://epg.pw/xmltv/epg_$cc.xml.gz",
+            fallbacks = listOf("https://epg.pw/xmltv/epg_$cc.xml")))
     }
 
     suspend fun globeTv(country: Country): List<Feed> {
@@ -106,7 +110,10 @@ class FeedResolver(private val http: CachedHttp, private val json: Json) {
         if (country.code != STREAMING.code) return emptyList()
         val base = "https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master"
         return listOf("PlutoTV" to "Pluto TV", "SamsungTVPlus" to "Samsung TV Plus", "Plex" to "Plex", "Roku" to "Roku")
-            .map { (dir, label) -> Feed(SourceIds.FAST, "Free streaming TV", label, "$base/$dir/all.xml.gz") }
+            .map { (dir, label) ->
+                Feed(SourceIds.FAST, "Free streaming TV", label, "$base/$dir/all.xml.gz",
+                    fallbacks = listOf("https://i.mjh.nz/$dir/all.xml.gz"))
+            }
     }
 
     fun custom(country: Country, sources: List<CustomSource>): List<Feed> =

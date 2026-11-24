@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.worldtv.guide.data.BUILT_IN_SOURCES
 import com.worldtv.guide.data.Country
+import com.worldtv.guide.data.FeedResult
 import com.worldtv.guide.data.FeedStatus
 import com.worldtv.guide.data.Prefs
 import com.worldtv.guide.ui.components.CountryPickerSheet
@@ -80,7 +81,7 @@ fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs) {
                 val feeds = guide.feeds.filter { it.sourceId == src.id }
                 SourceCard(
                     title = src.name, body = src.description,
-                    status = statusLine(feeds.map { Triple(it.label, it.status, it.programmes.size) }, guide.country),
+                    status = statusLine(feeds, guide.country),
                     enabled = src.id !in disabled,
                     onToggle = { prefs.setSourceEnabled(src.id, it) },
                     extra = {
@@ -112,7 +113,7 @@ fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs) {
                     ?: "All countries"
                 SourceCard(
                     title = c.name, body = "${c.url}\nShown for: $where",
-                    status = statusLine(feeds.map { Triple(it.label, it.status, it.programmes.size) }, guide.country),
+                    status = statusLine(feeds, guide.country),
                     enabled = id !in disabled,
                     onToggle = { prefs.setSourceEnabled(id, it) },
                     extra = {
@@ -130,13 +131,14 @@ fun SourcesScreen(guideVm: GuideViewModel, prefs: Prefs) {
     )
 }
 
-private fun statusLine(feeds: List<Triple<String, FeedStatus, Int>>, country: Country): String? {
+private fun statusLine(feeds: List<FeedResult>, country: Country): String? {
     if (feeds.isEmpty()) return null
-    return "${country.flag} " + feeds.joinToString("  ·  ") { (label, st, n) ->
-        when (st) {
-            FeedStatus.LOADING -> "$label: loading…"
-            FeedStatus.DONE -> "$label: %,d programmes".format(n)
-            FeedStatus.FAILED -> "$label: failed"
+    return "${country.flag} " + feeds.joinToString("  ·  ") { f ->
+        when {
+            f.status == FeedStatus.LOADING -> "${f.label}: loading…"
+            f.status == FeedStatus.FAILED -> "${f.label}: failed (${f.error ?: "unknown error"})"
+            f.emptyForDay -> "${f.label}: ${f.staleNote}"
+            else -> "${f.label}: %,d programmes".format(f.programmes.size)
         }
     }
 }

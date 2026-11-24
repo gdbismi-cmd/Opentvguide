@@ -42,15 +42,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.worldtv.guide.data.Programme
+import com.worldtv.guide.ui.components.FitText
 import com.worldtv.guide.ui.theme.Snap
 import com.worldtv.guide.util.localTime
 import java.time.Instant
 
 /** Width of one minute on the timeline. 3.5 dp → 210 dp per hour. */
 private val PerMin = 3.5.dp
-private val LabelWidth = 96.dp
-private val RowHeight = 62.dp
-private val HeaderHeight = 30.dp
+private val LabelWidth = 116.dp
+private val RowHeight = 44.dp
+private val HeaderHeight = 24.dp
 
 private class GridChannel(val name: String, val logo: String?, val programmes: List<Programme>)
 
@@ -129,7 +130,7 @@ private fun TimeRuler(start: Instant, totalMinutes: Float, nowX: Dp?, scroll: Sc
                 .background(Snap.SectionText.copy(alpha = if (onHour) 0.45f else 0.18f)))
             Text(
                 start.plusSeconds(m * 60L).localTime(),
-                Modifier.absoluteOffset(x = x + 4.dp).padding(top = 7.dp),
+                Modifier.absoluteOffset(x = x + 4.dp).padding(top = 4.dp),
                 color = Snap.SectionText.copy(alpha = if (onHour) 1f else 0.7f),
                 fontSize = 11.sp, fontWeight = if (onHour) FontWeight.Bold else FontWeight.Normal, maxLines = 1,
             )
@@ -179,19 +180,18 @@ private fun GridRow(
 @Composable
 private fun ChannelLabel(c: GridChannel, bg: Color, modifier: Modifier) {
     Row(
-        modifier.width(LabelWidth).fillMaxHeight().background(bg).padding(horizontal = 6.dp),
+        modifier.width(LabelWidth).fillMaxHeight().background(bg).padding(horizontal = 5.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).background(Snap.Well),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(c.name.take(2).uppercase(), color = Snap.Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            if (c.logo != null) AsyncImage(c.logo, null, Modifier.fillMaxSize().padding(2.dp), contentScale = ContentScale.Fit)
+        if (c.logo != null) {
+            Box(
+                Modifier.size(24.dp).clip(RoundedCornerShape(5.dp)).background(Snap.Well),
+                contentAlignment = Alignment.Center,
+            ) { AsyncImage(c.logo, null, Modifier.fillMaxSize().padding(2.dp), contentScale = ContentScale.Fit) }
+            Spacer(Modifier.width(5.dp))
         }
-        Spacer(Modifier.width(6.dp))
-        Text(c.name, color = Snap.Text, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2,
-            overflow = TextOverflow.Ellipsis, lineHeight = 13.sp)
+        // Full name: wraps to three lines and shrinks to fit rather than being cut off.
+        FitText(c.name, Modifier.weight(1f), maxSize = 11.sp, minSize = 7.sp, maxLines = 3)
     }
     // Divider between the pinned column and the timeline.
     Box(modifier.absoluteOffset(x = LabelWidth - 1.dp).width(1.dp).fillMaxHeight().background(Snap.Line))
@@ -203,12 +203,13 @@ private fun GridCell(p: Programme, x: Dp, w: Dp, now: Instant, fav: Boolean, onC
     val ended = p.hasEnded(now)
     val shape = RoundedCornerShape(6.dp)
     Box(
-        Modifier.absoluteOffset(x = x + 1.dp).width(w - 2.dp).fillMaxHeight().padding(vertical = 4.dp)
+        Modifier.absoluteOffset(x = x + 1.dp).width(w - 2.dp).fillMaxHeight().padding(vertical = 3.dp)
             .clip(shape)
             .background(if (live) Snap.LiveRow else Snap.Well.copy(alpha = if (ended) 0.45f else 0.9f))
             .border(if (live) 1.5.dp else 0.5.dp, if (live) Snap.Accent else Snap.Line, shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -216,12 +217,13 @@ private fun GridCell(p: Programme, x: Dp, w: Dp, now: Instant, fav: Boolean, onC
                     Icon(Icons.Filled.Star, null, Modifier.size(11.dp), tint = Snap.Accent)
                     Spacer(Modifier.width(2.dp))
                 }
-                Text(p.title, color = if (ended) Snap.Muted else Snap.Text, fontSize = 12.sp,
+                Text(p.title, color = if (ended) Snap.Muted else Snap.Text, fontSize = 11.sp, lineHeight = 13.sp,
                     fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(
                 "${p.start.localTime()}–${p.end.localTime()}" + (p.subtitle?.let { " · $it" } ?: ""),
-                color = if (live) Snap.Accent else Snap.Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (live) Snap.Accent else Snap.Muted, fontSize = 9.sp, lineHeight = 11.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
     }

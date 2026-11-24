@@ -293,7 +293,8 @@ private fun SourceStrip(feeds: List<FeedResult>, onClick: () -> Unit) {
         items(feeds, key = { it.key }) { f ->
             val (mark, color) = when (f.status) {
                 FeedStatus.LOADING -> "…" to Snap.Muted
-                FeedStatus.DONE -> "✓ %,d".format(f.programmes.size) to Snap.Ok
+                FeedStatus.DONE -> if (f.emptyForDay) "⚠ ${f.staleNote}" to Snap.Muted
+                    else "✓ %,d".format(f.programmes.size) to Snap.Ok
                 FeedStatus.FAILED -> "✕" to Snap.Bad
             }
             Text(
@@ -349,7 +350,7 @@ private fun ChannelHeader(name: String, logo: String?, count: Int) {
         }
         Spacer(Modifier.width(10.dp))
         Text(name, Modifier.weight(1f), color = Snap.SectionText, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
+            lineHeight = 17.sp)
         Text("$count", color = Snap.SectionText.copy(alpha = 0.7f), fontSize = 12.sp)
     }
 }
@@ -390,11 +391,9 @@ fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean,
                 Text(p.title, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     color = if (ended) Snap.Muted else Snap.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            val sub = listOfNotNull(
-                p.channelName.takeIf { showChannel },
-                p.subtitle,
-                p.genres.firstOrNull(),
-            ).joinToString(" · ")
+            if (showChannel) Text(p.channelName, fontSize = 12.sp, lineHeight = 15.sp, color = Snap.Accent,
+                fontWeight = FontWeight.Bold)
+            val sub = listOfNotNull(p.subtitle, p.genres.firstOrNull()).joinToString(" · ")
             if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = Snap.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (live) {
                 Spacer(Modifier.height(5.dp))

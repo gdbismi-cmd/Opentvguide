@@ -64,9 +64,9 @@ class TvRepository(cacheDir: File) {
     // ---------------- All guide sources, merged ----------------
 
     private val resolver = FeedResolver(http, json)
-    private val parseLimit = Semaphore(2) // bound memory: at most two big XML files parsed at once
-    private val parsedCache = object : LinkedHashMap<String, List<Programme>>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Programme>>?) = size > 10
+    private val parseLimit = Semaphore(3) // bound memory: at most three big XML files parsed at once
+    private val parsedCache = object : LinkedHashMap<String, XmltvResult>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, XmltvResult>?) = size > 10
     }
     private val programmeIndex = java.util.concurrent.ConcurrentHashMap<String, Programme>()
 
@@ -99,14 +99,16 @@ class TvRepository(cacheDir: File) {
                 emptyList()
             }
 
-        launch {
-            val feeds = resolve(SourceIds.EPGSHARE, "epgshare01") { resolver.epgshare(country) } +
-                resolve(SourceIds.EPGPW, "epg.pw") { resolver.epgPw(country) } +
-                resolve(SourceIds.GLOBETV, "GlobeTV") { resolver.globeTv(country) } +
-                resolve(SourceIds.FAST, "Free streaming TV") { resolver.fast(country) } +
-                resolver.custom(country, custom).filter { it.sourceId !in disabled }
-            feeds.distinctBy { it.url }.forEach { f -> launch { loadFeed(f, date, from, to, force) } }
+        // Each source is looked up on its own, and its guide files start loading as soon as it answers.
+        val started = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        fun start(feeds: List<Feed>) = feeds.forEach { f ->
+            if (started.add(f.url)) launch { loadFeed(f, date, from, to, force) }
         }
+        launch { start(resolve(SourceIds.EPGSHARE, "epgshare01") { resolver.epgshare(country) }) }
+        launch { start(resolve(SourceIds.EPGPW, "epg.pw") { resolver.epgPw(country) }) }
+        launch { start(resolve(SourceIds.GLOBETV, "GlobeTV") { resolver.globeTv(country) }) }
+        launch { start(resolve(SourceIds.FAST, "Free streaming TV") { resolver.fast(country) }) }
+        start(resolver.custom(country, custom).filter { it.sourceId !in disabled })
     }
 
     private suspend fun ProducerScope<FeedResult>.loadFeed(
@@ -117,18 +119,18 @@ class TvRepository(cacheDir: File) {
         val cacheKey = "${f.url}|$date"
         runCatching {
             synchronized(parsedCache) { parsedCache[cacheKey] }?.takeIf { !force }?.let { return@runCatching it }
-            val file = http.getFile(f.url, maxAgeMs = 6L * 60 * 60 * 1000, force = force)
+            val file = http.getFile(f.url, maxAgeMs = 6L * 60 * 60 * 1000, force = force, fallbacks = f.fallbacks)
             parseLimit.withPermit {
                 withContext(Dispatchers.Default) {
                     XmltvParser.parseFile(file, from, to, f.sourceId, "${f.sourceName} · ${f.label}")
                 }
-            }.also { list ->
-                synchronized(parsedCache) { parsedCache[cacheKey] = list }
+            }.also { result ->
+                synchronized(parsedCache) { parsedCache[cacheKey] = result }
                 if (programmeIndex.size > 300_000) programmeIndex.clear()
-                list.forEach { programmeIndex[it.id] = it }
+                result.programmes.forEach { programmeIndex[it.id] = it }
             }
         }
-            .onSuccess { send(base.copy(status = FeedStatus.DONE, programmes = it)) }
+            .onSuccess { send(base.copy(status = FeedStatus.DONE, programmes = it.programmes, coversUntil = it.coversUntil)) }
             .onFailure { send(base.copy(status = FeedStatus.FAILED, error = it.message ?: it.javaClass.simpleName)) }
     }
 
@@ -148,4 +150,14 @@ data class FeedResult(
     val status: FeedStatus,
     val programmes: List<Programme> = emptyList(),
     val error: String? = null,
-)
+    /** For guide files: the last time the file has listings for (null if unknown). */
+    val coversUntil: java.time.Instant? = null,
+) {
+    /** Loaded fine but has nothing for the chosen day, usually because the file is out of date. */
+    val emptyForDay: Boolean get() = status == FeedStatus.DONE && programmes.isEmpty()
+
+    val staleNote: String?
+        get() = if (!emptyForDay) null else coversUntil?.let {
+            "guide ends " + java.time.format.DateTimeFormatter.ofPattern("d MMM").format(it.atZone(ZoneId.systemDefault()))
+        } ?: "no listings for this day"
+}

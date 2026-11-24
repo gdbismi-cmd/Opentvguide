@@ -14,6 +14,9 @@ import java.util.zip.GZIPInputStream
  * Streaming XMLTV parser. Only programmes overlapping [from]..[to] are kept, so even
  * very large guide files can be read with little memory.
  */
+/** Programmes kept for the requested window, plus the last time the file has data for. */
+class XmltvResult(val programmes: List<Programme>, val coversUntil: Instant?)
+
 object XmltvParser {
 
     private class RawProg(
@@ -25,7 +28,7 @@ object XmltvParser {
     fun parseFile(
         file: File, from: Instant, to: Instant,
         sourceId: String, sourceName: String, limit: Int = 80_000,
-    ): List<Programme> = openMaybeGzip(file).use { parse(it, from, to, sourceId, sourceName, limit) }
+    ): XmltvResult = openMaybeGzip(file).use { parse(it, from, to, sourceId, sourceName, limit) }
 
     private fun openMaybeGzip(file: File): InputStream {
         val bin = BufferedInputStream(file.inputStream(), 64 * 1024)
@@ -38,7 +41,8 @@ object XmltvParser {
     fun parse(
         input: InputStream, from: Instant, to: Instant,
         sourceId: String, sourceName: String, limit: Int = 80_000,
-    ): List<Programme> {
+    ): XmltvResult {
+        var coversUntil: Instant? = null
         val p = Xml.newPullParser()
         p.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
         p.setInput(input, null)
@@ -59,6 +63,7 @@ object XmltvParser {
                         if (start == null || ch == null) { skip(p) }
                         else {
                             val end = stop ?: start.plusSeconds(30 * 60)
+                            if (coversUntil == null || end.isAfter(coversUntil)) coversUntil = end
                             if (end.isAfter(from) && start.isBefore(to)) readProgramme(p, ch, start, end)?.let { raw += it }
                             else skip(p)
                         }
@@ -68,7 +73,7 @@ object XmltvParser {
             event = p.next()
         }
 
-        return raw.map { r ->
+        val programmes = raw.map { r ->
             Programme(
                 id = "x:${Integer.toHexString(sourceName.hashCode())}:${r.channelId}:${r.start.epochSecond}",
                 title = r.title,
@@ -82,6 +87,7 @@ object XmltvParser {
                 sourceId = sourceId, sourceName = sourceName,
             )
         }.distinctBy { it.id }
+        return XmltvResult(programmes, coversUntil)
     }
 
     private fun readChannel(p: XmlPullParser, names: MutableMap<String, String>, icons: MutableMap<String, String>) {
@@ -171,19 +177,23 @@ object XmltvParser {
         return if (system == "onscreen" || system == null) text.takeIf { it.length <= 16 } else null
     }
 
-    /** XMLTV time: "YYYYMMDDhhmmss +hhmm" (seconds and offset optional; no offset means UTC). */
+    private val timeRe = Regex("""^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*(Z|[+-]\d{2}:?\d{2})?""")
+
+    /**
+     * XMLTV time: "YYYYMMDDhhmm[ss] [+hhmm]". Also accepts the offset without a space,
+     * "+hh:mm" and "Z". No offset means UTC, as the XMLTV spec says.
+     */
     fun parseTime(s: String?): Instant? {
-        if (s == null) return null
-        val v = s.trim()
-        if (v.length < 12) return null
+        val m = timeRe.find(s?.trim() ?: return null) ?: return null
+        val g = m.groupValues
         return runCatching {
-            val y = v.substring(0, 4).toInt(); val mo = v.substring(4, 6).toInt(); val d = v.substring(6, 8).toInt()
-            val h = v.substring(8, 10).toInt(); val mi = v.substring(10, 12).toInt()
-            val sec = if (v.length >= 14 && v[12].isDigit()) v.substring(12, 14).toInt() else 0
-            val off = v.substringAfter(' ', "").trim().let { o ->
-                if (o.matches(Regex("[+-]\\d{4}"))) ZoneOffset.of(o) else ZoneOffset.UTC
+            val off = when (val o = g[7]) {
+                "", "Z" -> ZoneOffset.UTC
+                else -> ZoneOffset.of(if (o.contains(':')) o else o.substring(0, 3) + ":" + o.substring(3))
             }
-            LocalDateTime.of(y, mo, d, h, mi, sec).toInstant(off)
+            LocalDateTime.of(
+                g[1].toInt(), g[2].toInt(), g[3].toInt(), g[4].toInt(), g[5].toInt(), g[6].ifEmpty { "0" }.toInt(),
+            ).toInstant(off)
         }.getOrNull()
     }
 }

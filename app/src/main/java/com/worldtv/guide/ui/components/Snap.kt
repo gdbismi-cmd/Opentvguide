@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -218,3 +219,31 @@ fun SnapIcon(icon: ImageVector, color: Color, size: Int = 34) {
 fun Color.lighten(f: Float) = Color(red + (1 - red) * f, green + (1 - green) * f, blue + (1 - blue) * f, alpha)
 fun Color.darken(f: Float) = Color(red * (1 - f), green * (1 - f), blue * (1 - f), alpha)
 
+
+/**
+ * Shows the whole text: wraps onto up to [maxLines] lines and steps the font size down
+ * until it fits, instead of cutting it off with "…".
+ */
+@Composable
+fun FitText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Snap.Text,
+    maxSize: androidx.compose.ui.unit.TextUnit = 12.sp,
+    minSize: androidx.compose.ui.unit.TextUnit = 7.sp,
+    maxLines: Int = 3,
+    fontWeight: FontWeight = FontWeight.Bold,
+) {
+    var size by remember(text, maxSize) { mutableStateOf(maxSize) }
+    var ready by remember(text, maxSize) { mutableStateOf(false) }
+    Text(
+        text,
+        modifier.drawWithContent { if (ready) drawContent() },
+        color = color, fontSize = size, fontWeight = fontWeight,
+        lineHeight = size * 1.12f, maxLines = maxLines, softWrap = true,
+        onTextLayout = { r ->
+            if (r.hasVisualOverflow && size > minSize) size = (size.value * 0.9f).coerceAtLeast(minSize.value).sp
+            else ready = true
+        },
+    )
+}
