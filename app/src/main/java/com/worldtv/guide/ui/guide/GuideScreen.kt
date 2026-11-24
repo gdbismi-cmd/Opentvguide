@@ -108,12 +108,23 @@ fun GuideScreen(
             else -> s.date.atTime(18, 30).atZone(zone).toInstant()
         }
     }
-    val gridProgrammes = remember(s.programmes, s.query, s.genre) {
+    // Channels per language, biggest first, "Other" last.
+    val languageCounts = remember(s.programmes) {
+        s.programmes.distinctBy { it.channelKey }.groupingBy { it.language ?: OTHER_LANGUAGE }.eachCount()
+            .entries.sortedWith(compareBy<Map.Entry<String, Int>> { it.key == OTHER_LANGUAGE }.thenByDescending { it.value })
+            .map { it.key to it.value }
+    }
+    val languageRank = remember(languageCounts) { languageCounts.mapIndexed { i, (l, _) -> l to i }.toMap() }
+    val showLanguages = s.byLanguage && languageCounts.size > 1
+    val langFilter: String? = s.language.takeIf { showLanguages }
+
+    val gridProgrammes = remember(s.programmes, s.query, s.genre, langFilter) {
         val q = s.query.trim()
         val genre: String? = s.genre
         s.programmes.filter { p ->
             (q.isEmpty() || p.title.contains(q, true) || p.channelName.contains(q, true)) &&
-                (genre == null || genre in p.genres)
+                (genre == null || genre in p.genres) &&
+                (langFilter == null || (p.language ?: OTHER_LANGUAGE) == langFilter)
         }
     }
 
@@ -125,7 +136,7 @@ fun GuideScreen(
             .entries.sortedByDescending { it.value }.take(30).map { it.key }
     }
     val isToday = s.date == LocalDate.now()
-    val filtered = remember(s.programmes, s.query, s.genre, s.onNowOnly, s.hideEnded, isToday, now, mode) {
+    val filtered = remember(s.programmes, s.query, s.genre, s.onNowOnly, s.hideEnded, isToday, now, mode, langFilter) {
         val q = s.query.trim()
         val genre: String? = s.genre
         val eveningStart = LocalDate.now().atTime(LocalTime.of(18, 0)).atZone(zone).toInstant()
@@ -139,7 +150,8 @@ fun GuideScreen(
             modeOk &&
                 (q.isEmpty() || p.title.contains(q, true) || p.channelName.contains(q, true) ||
                     p.subtitle?.contains(q, true) == true) &&
-                (genre == null || genre in p.genres)
+                (genre == null || genre in p.genres) &&
+                (langFilter == null || (p.language ?: OTHER_LANGUAGE) == langFilter)
         }
     }
 
@@ -178,7 +190,19 @@ fun GuideScreen(
                 }
                 item { Pill(if (s.byChannel) "By channel" else "By time", true, vm::toggleGrouping) }
             }
+            if (mode != GuideMode.SEARCH && languageCounts.size > 1) {
+                item { Pill("🗣 By language", s.byLanguage, vm::toggleByLanguage) }
+            }
             items(genres) { g -> Pill(g, s.genre == g) { vm.setGenre(if (s.genre == g) null else g) } }
+        }
+        if (showLanguages) LazyRow(
+            Modifier.padding(bottom = 4.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            item { Pill("All languages", s.language == null) { vm.setLanguage(null) } }
+            items(languageCounts, key = { it.first }) { (lang, n) ->
+                Pill("$lang · $n", s.language == lang) { vm.setLanguage(if (s.language == lang) null else lang) }
+            }
         }
         SourceStrip(s.feeds, onSources)
         if (s.loading && s.programmes.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Snap.Accent)
@@ -201,20 +225,29 @@ fun GuideScreen(
             useGrid -> GuideGrid(
                 programmes = gridProgrammes, windowStart = gridStart, windowEnd = gridEnd,
                 initialFocus = gridFocus, now = now, favKeys = favKeys, hScroll = hScroll,
+                languageRank = languageRank.takeIf { showLanguages },
                 onProgramme = onProgramme,
             )
             mode == GuideMode.SEARCH && s.query.isBlank() -> CenterMessage(
                 "Search ${"%,d".format(s.programmes.size)} programmes", "Type a show, film, team or channel name.")
             filtered.isEmpty() -> CenterMessage("Nothing matches", "Try clearing the search or filters.")
             byChannel -> {
-                val groups = remember(filtered) {
-                    filtered.groupBy { it.channelKey }.values
-                        .map { list -> Triple(list.first().channelName, list.firstNotNullOfOrNull { it.channelLogo }, list) }
-                        .sortedBy { it.first.lowercase() }
+                val groups = remember(filtered, showLanguages, languageRank) {
+                    val base = filtered.groupBy { it.channelKey }.values.map { list ->
+                        ChannelGroup(list.first().channelName, list.firstNotNullOfOrNull { it.channelLogo },
+                            list.first().language ?: OTHER_LANGUAGE, list)
+                    }
+                    if (showLanguages) base.sortedWith(compareBy<ChannelGroup>({ languageRank[it.language] ?: 99 }, { it.name.lowercase() }))
+                    else base.sortedBy { it.name.lowercase() }
                 }
+                val perLanguage = remember(groups) { groups.groupingBy { it.language }.eachCount() }
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
                     item { Count(filtered.size, groups.size) }
-                    groups.forEachIndexed { gi, (channel, logo, list) ->
+                    groups.forEachIndexed { gi, g ->
+                        val (channel, logo, list) = Triple(g.name, g.logo, g.programmes)
+                        if (showLanguages && (gi == 0 || groups[gi - 1].language != g.language)) {
+                            item(key = "lang_${g.language}") { LanguageHeader(g.language, perLanguage[g.language] ?: 0) }
+                        }
                         stickyHeader(key = "h_$gi$channel") { ChannelHeader(channel, logo, list.size) }
                         itemsIndexed(list, key = { _, p -> "g${gi}_${p.id}" }) { i, p ->
                             ProgrammeRow(p, now, showChannel = false, fav = p.favKey in favKeys, index = i) { onProgramme(p) }
@@ -233,6 +266,22 @@ fun GuideScreen(
 }
 
 private fun isTodaySelected(d: LocalDate) = d == LocalDate.now()
+
+const val OTHER_LANGUAGE = "Other"
+
+private class ChannelGroup(val name: String, val logo: String?, val language: String, val programmes: List<Programme>)
+
+/** Bold accent band that starts each language block. */
+@Composable
+fun LanguageHeader(language: String, channels: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().background(Snap.accentBar).padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("🗣  $language", Modifier.weight(1f), color = Snap.OnAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text("$channels channel${if (channels == 1) "" else "s"}", color = Snap.OnAccent.copy(alpha = 0.85f), fontSize = 12.sp)
+    }
+}
 
 /** Segmented List / Grid switch, plus a "Now" jump button in grid view. */
 @Composable

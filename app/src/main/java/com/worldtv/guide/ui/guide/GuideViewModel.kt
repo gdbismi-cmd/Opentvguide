@@ -9,6 +9,7 @@ import com.worldtv.guide.WorldTvApp
 import com.worldtv.guide.data.Country
 import com.worldtv.guide.data.FeedResult
 import com.worldtv.guide.data.FeedStatus
+import com.worldtv.guide.data.LanguageGuess
 import com.worldtv.guide.data.LogoIndex
 import com.worldtv.guide.data.Prefs
 import com.worldtv.guide.data.Programme
@@ -38,6 +39,9 @@ data class GuideState(
     val hideEnded: Boolean = true,
     val byChannel: Boolean = true,
     val grid: Boolean = false,
+    /** Group/sort channels by language (on by default for India). */
+    val byLanguage: Boolean = false,
+    val language: String? = null,
     val genre: String? = null,
 ) {
     val loading: Boolean get() = feeds.isEmpty() || feeds.any { it.status == FeedStatus.LOADING }
@@ -58,7 +62,7 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
             val list = runCatching { repo.countries() }.getOrDefault(emptyList())
             val selected = if (saved == STREAMING.code) STREAMING
             else list.firstOrNull { it.code == saved } ?: list.firstOrNull { it.code == "US" } ?: _state.value.country
-            _state.update { it.copy(countries = listOf(STREAMING) + list, country = selected) }
+            _state.update { it.copy(countries = listOf(STREAMING) + list, country = selected, byLanguage = selected.code == "IN") }
             load()
         }
         // Reload when sources are switched on/off or custom guides change.
@@ -129,13 +133,22 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
         val logos = HashMap<String, String?>()
         byKey.values.forEach { p -> p.channelLogo?.let { logos.putIfAbsent(p.channelKey, it) } }
         val idx = logoIndex
+
+        // One language per channel: iptv-org data, then the channel name, then its programmes' language.
+        val byChannel = byKey.values.groupBy { it.channelKey }
+        val languages = HashMap<String, String?>(byChannel.size)
+        byChannel.forEach { (key, list) ->
+            val name = list.first().channelName
+            languages[key] = idx?.info(name, countryCode)?.languages?.firstOrNull()
+                ?: LanguageGuess.fromName(name)
+                ?: list.mapNotNull { it.language }.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+        }
+
         val out = byKey.values.map { p ->
-            if (p.channelLogo != null) p
-            else {
-                val logo = if (logos.containsKey(p.channelKey)) logos[p.channelKey]
-                else idx?.find(p.channelName, countryCode).also { logos[p.channelKey] = it }
-                if (logo != null) p.copy(channelLogo = logo) else p
-            }
+            val logo = p.channelLogo ?: if (logos.containsKey(p.channelKey)) logos[p.channelKey]
+            else idx?.find(p.channelName, countryCode).also { logos[p.channelKey] = it }
+            val lang = languages[p.channelKey]
+            if (logo == p.channelLogo && lang == p.language) p else p.copy(channelLogo = logo, language = lang)
         }
         return out.sortedBy { it.start }
     }
@@ -150,7 +163,7 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
 
     fun setCountry(c: Country) {
         prefs.guideCountry = c.code
-        _state.update { it.copy(country = c, genre = null) }
+        _state.update { it.copy(country = c, genre = null, language = null, byLanguage = c.code == "IN") }
         load()
     }
 
@@ -169,6 +182,8 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
         _state.update { it.copy(grid = grid) }
     }
     fun setGenre(g: String?) = _state.update { it.copy(genre = g) }
+    fun toggleByLanguage() = _state.update { it.copy(byLanguage = !it.byLanguage, language = null) }
+    fun setLanguage(l: String?) = _state.update { it.copy(language = l) }
 
     /** Jump here from a channel page: switch to that channel's country and search for it. */
     fun openFromChannel(countryCode: String, channelName: String) {

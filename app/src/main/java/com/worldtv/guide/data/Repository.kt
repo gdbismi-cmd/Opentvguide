@@ -47,8 +47,15 @@ class TvRepository(cacheDir: File) {
                 val week = 7L * 24 * 60 * 60 * 1000
                 val ch = http.get("$IPTV/channels.json", "iptv_channels.json", week)
                 val lo = http.get("$IPTV/logos.json", "iptv_logos.json", week)
+                val fe = runCatching { http.get("$IPTV/feeds.json", "iptv_feeds.json", week) }.getOrNull()
+                val la = runCatching { http.get("$IPTV/languages.json", "iptv_languages.json", 30 * week) }.getOrNull()
                 withContext(Dispatchers.Default) {
-                    LogoIndex.build(json.decodeFromString<List<IptvLogoChannel>>(ch), json.decodeFromString<List<IptvLogo>>(lo))
+                    LogoIndex.build(
+                        json.decodeFromString<List<IptvLogoChannel>>(ch),
+                        json.decodeFromString<List<IptvLogo>>(lo),
+                        fe?.let { runCatching { json.decodeFromString<List<IptvFeed>>(it) }.getOrNull() }.orEmpty(),
+                        la?.let { runCatching { json.decodeFromString<List<IptvLanguage>>(it) }.getOrNull() }.orEmpty(),
+                    )
                 }
             }.getOrNull()?.also { logoIndex = it }
         }

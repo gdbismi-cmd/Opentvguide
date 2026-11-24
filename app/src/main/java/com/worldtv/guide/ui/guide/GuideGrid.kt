@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,7 +54,7 @@ private val LabelWidth = 116.dp
 private val RowHeight = 44.dp
 private val HeaderHeight = 24.dp
 
-private class GridChannel(val name: String, val logo: String?, val programmes: List<Programme>)
+private class GridChannel(val name: String, val logo: String?, val language: String, val programmes: List<Programme>)
 
 private fun minutesBetween(a: Instant, b: Instant) = (b.epochSecond - a.epochSecond) / 60f
 
@@ -72,9 +73,11 @@ fun GuideGrid(
     now: Instant,
     favKeys: Set<String>,
     hScroll: ScrollState,
+    /** When set, channels are grouped by language in this order with a header per language. */
+    languageRank: Map<String, Int>? = null,
     onProgramme: (Programme) -> Unit,
 ) {
-    val channels = remember(programmes, windowStart, windowEnd) {
+    val channels = remember(programmes, windowStart, windowEnd, languageRank) {
         programmes.asSequence()
             .filter { it.end.isAfter(windowStart) && it.start.isBefore(windowEnd) }
             .groupBy { it.channelKey }.values
@@ -85,9 +88,13 @@ fun GuideGrid(
                     val last = clean.lastOrNull()
                     if (last == null || !p.start.isBefore(last.end.minusSeconds(60))) clean += p
                 }
-                GridChannel(list.first().channelName, list.firstNotNullOfOrNull { it.channelLogo }, clean)
+                GridChannel(list.first().channelName, list.firstNotNullOfOrNull { it.channelLogo },
+                    list.first().language ?: OTHER_LANGUAGE, clean)
             }
-            .sortedBy { it.name.lowercase() }
+            .sortedWith(
+                if (languageRank != null) compareBy<GridChannel>({ languageRank[it.language] ?: 99 }, { it.name.lowercase() })
+                else compareBy<GridChannel> { it.name.lowercase() },
+            )
             .toList()
     }
     val totalMinutes = minutesBetween(windowStart, windowEnd)
@@ -108,8 +115,19 @@ fun GuideGrid(
     Box(Modifier.fillMaxSize().horizontalScroll(hScroll)) {
         LazyColumn(Modifier.width(LabelWidth + timelineWidth).fillMaxHeight()) {
             stickyHeader(key = "ruler") { TimeRuler(windowStart, totalMinutes, nowX, hScroll) }
-            itemsIndexed(channels, key = { _, c -> c.name + c.programmes.first().id }) { i, c ->
-                GridRow(c, i, windowStart, windowEnd, now, nowX, favKeys, hScroll, onProgramme)
+            val perLanguage = channels.groupingBy { it.language }.eachCount()
+            channels.forEachIndexed { i, c ->
+                if (languageRank != null && (i == 0 || channels[i - 1].language != c.language)) {
+                    item(key = "lang_${c.language}") {
+                        Box(Modifier.width(LabelWidth + timelineWidth)) {
+                            LanguageHeader(c.language, perLanguage[c.language] ?: 0,
+                                Modifier.pinLeft(hScroll).width(LocalConfiguration.current.screenWidthDp.dp))
+                        }
+                    }
+                }
+                item(key = c.name + c.programmes.first().id) {
+                    GridRow(c, i, windowStart, windowEnd, now, nowX, favKeys, hScroll, onProgramme)
+                }
             }
         }
     }

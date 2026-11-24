@@ -19,6 +19,8 @@ data class Programme(
     val sourceName: String,
     val tvmazeEpisodeId: Long? = null,
     val tvmazeShowId: Int? = null,
+    /** The channel's language (e.g. "Hindi", "Tamil"), when known. */
+    val language: String? = null,
 ) {
     val channelKey: String get() = normalizeChannel(channelName)
 
@@ -64,5 +66,6 @@ fun TmEpisode.toProgramme(): Programme? {
         sourceName = "TVmaze",
         tvmazeEpisodeId = id,
         tvmazeShowId = show?.id,
+        language = show?.language,
     )
 }
