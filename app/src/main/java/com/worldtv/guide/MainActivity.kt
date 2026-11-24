@@ -116,13 +116,14 @@ class MainActivity : ComponentActivity() {
                                 "programme/{id}",
                                 arguments = listOf(navArgument("id") { type = NavType.StringType }),
                             ) { entry ->
-                                ProgrammeDetailScreen(Uri.decode(entry.arguments?.getString("id").orEmpty()), app.repo, app.prefs)
+                                ProgrammeDetailScreen(Uri.decode(entry.arguments?.getString("id").orEmpty()), guideVm::programme, app.prefs)
                             }
                             composable(
                                 "episode/{id}",
                                 arguments = listOf(navArgument("id") { type = NavType.LongType }),
                             ) { entry ->
-                                EpisodeDetailScreen(entry.arguments?.getLong("id") ?: 0L, app.repo, app.prefs)
+                                val epId = entry.arguments?.getLong("id") ?: 0L
+                                EpisodeDetailScreen(epId, app.repo, app.prefs, merged = guideVm.programme("tm:$epId"))
                             }
                         }
                     }

@@ -55,6 +55,7 @@ import com.worldtv.guide.data.FavShow
 import com.worldtv.guide.data.Prefs
 import com.worldtv.guide.data.TmEpisode
 import com.worldtv.guide.data.TvRepository
+import com.worldtv.guide.data.Programme
 import com.worldtv.guide.ui.components.CenterMessage
 import com.worldtv.guide.ui.components.Loading
 import com.worldtv.guide.ui.theme.LiveRed
@@ -70,7 +71,8 @@ import com.worldtv.guide.util.stripHtml
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs) {
+/** [merged] is the same airing as merged from all sources, used for any details TVmaze lacks. */
+fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs, merged: Programme? = null) {
     var ep by remember { mutableStateOf<TmEpisode?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
@@ -154,7 +156,7 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs) {
                         }
                     }
 
-                    val epSummary = e.summary.stripHtml()
+                    val epSummary = e.summary.stripHtml().ifBlank { merged?.description.orEmpty() }
                     val showSummary = show?.summary.stripHtml()
                     if (epSummary.isNotBlank()) {
                         Spacer(Modifier.height(16.dp))
@@ -165,6 +167,11 @@ fun EpisodeDetailScreen(id: Long, repo: TvRepository, prefs: Prefs) {
                         Spacer(Modifier.height(16.dp))
                         Text("About the show", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                         Text(showSummary, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    if (epSummary.isBlank() && showSummary.isBlank()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text("No description is available for this programme.", style = MaterialTheme.typography.bodyLarge,
+                            color = Snap.Muted)
                     }
 
                     Spacer(Modifier.height(24.dp))

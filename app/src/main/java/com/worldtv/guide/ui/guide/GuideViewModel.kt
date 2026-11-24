@@ -9,6 +9,7 @@ import com.worldtv.guide.WorldTvApp
 import com.worldtv.guide.data.Country
 import com.worldtv.guide.data.FeedResult
 import com.worldtv.guide.data.FeedStatus
+import com.worldtv.guide.data.LogoIndex
 import com.worldtv.guide.data.Prefs
 import com.worldtv.guide.data.Programme
 import com.worldtv.guide.data.STREAMING
@@ -48,6 +49,8 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
     private val _state = MutableStateFlow(GuideState(grid = prefs.guideView == "grid"))
     val state: StateFlow<GuideState> = _state.asStateFlow()
     private var loadJob: Job? = null
+    @Volatile private var logoIndex: LogoIndex? = null
+    private var currentFeeds: List<FeedResult> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -63,9 +66,23 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
         viewModelScope.launch { prefs.customSources.drop(1).collect { load() } }
     }
 
+    init {
+        // Channel logos for guides that don't include them; re-merge once they arrive.
+        viewModelScope.launch {
+            val idx = repo.logos() ?: return@launch
+            logoIndex = idx
+            val feeds = currentFeeds
+            if (feeds.isNotEmpty()) {
+                val merged = withContext(Dispatchers.Default) { merge(feeds) }
+                _state.update { it.copy(programmes = merged) }
+            }
+        }
+    }
+
     fun load(force: Boolean = false) {
         loadJob?.cancel()
         val s = _state.value
+        currentFeeds = emptyList()
         _state.update { it.copy(feeds = emptyList(), programmes = emptyList()) }
         loadJob = viewModelScope.launch {
             val results = LinkedHashMap<String, FeedResult>()
@@ -73,6 +90,7 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
                 .collect { r ->
                     results[r.key] = r
                     val feeds = results.values.toList()
+                    currentFeeds = feeds
                     val merged = if (r.status == FeedStatus.LOADING) null
                     else withContext(Dispatchers.Default) { merge(feeds) }
                     _state.update { st ->
@@ -84,27 +102,51 @@ class GuideViewModel(private val repo: TvRepository, private val prefs: Prefs) :
         }
     }
 
+    /** The merged (enriched) programme, for detail pages. */
+    fun programme(id: String): Programme? = _state.value.programmes.firstOrNull { it.id == id } ?: repo.programme(id)
+
     private fun noSources() = FeedResult("none", "none", "No sources", "No sources", FeedStatus.FAILED,
         error = "None of your enabled sources cover this country")
 
     /**
-     * Combines every finished feed, dropping duplicates of the same airing on the same channel
-     * (TVmaze wins because it has artwork and synopses).
+     * Combines every finished feed. The same airing from several sources is kept once
+     * (TVmaze first), with any description, image, genres or logo it lacks filled in from
+     * the other copies. Channels still without a logo get one from the iptv-org database.
      */
     private fun merge(feeds: List<FeedResult>): List<Programme> {
-        val seen = HashSet<String>()
-        val out = ArrayList<Programme>()
+        val byKey = LinkedHashMap<String, Programme>()
         feeds.filter { it.status == FeedStatus.DONE }
             .sortedBy { if (it.sourceId == SourceIds.TVMAZE) 0 else 1 }
             .forEach { f ->
                 f.programmes.forEach { p ->
                     val key = "${p.channelKey}|${p.start.epochSecond / 300}|${normalizeTitle(p.title)}"
-                    if (seen.add(key)) out += p
+                    val existing = byKey[key]
+                    byKey[key] = if (existing == null) p else existing.enrichedFrom(p)
                 }
             }
-        out.sortBy { it.start }
-        return out
+
+        val countryCode = _state.value.country.code.takeIf { it != STREAMING.code }
+        val logos = HashMap<String, String?>()
+        byKey.values.forEach { p -> p.channelLogo?.let { logos.putIfAbsent(p.channelKey, it) } }
+        val idx = logoIndex
+        val out = byKey.values.map { p ->
+            if (p.channelLogo != null) p
+            else {
+                val logo = if (logos.containsKey(p.channelKey)) logos[p.channelKey]
+                else idx?.find(p.channelName, countryCode).also { logos[p.channelKey] = it }
+                if (logo != null) p.copy(channelLogo = logo) else p
+            }
+        }
+        return out.sortedBy { it.start }
     }
+
+    private fun Programme.enrichedFrom(o: Programme) = copy(
+        description = description?.takeIf { it.isNotBlank() } ?: o.description,
+        subtitle = subtitle ?: o.subtitle,
+        image = image ?: o.image,
+        genres = genres.ifEmpty { o.genres },
+        channelLogo = channelLogo ?: o.channelLogo,
+    )
 
     fun setCountry(c: Country) {
         prefs.guideCountry = c.code

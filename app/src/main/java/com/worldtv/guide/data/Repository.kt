@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -31,6 +32,26 @@ class TvRepository(cacheDir: File) {
         return withContext(Dispatchers.Default) {
             json.decodeFromString<List<IptvCountry>>(raw).map { Country(it.code, it.name, it.flag) }.sortedBy { it.name }
         }.also { countriesCache = it }
+    }
+
+    // ---------------- Channel logos (iptv-org) ----------------
+
+    private val logoMutex = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var logoIndex: LogoIndex? = null
+
+    /** Name → logo lookup, downloaded once a week and kept in memory. Null if it can't be loaded. */
+    suspend fun logos(): LogoIndex? {
+        logoIndex?.let { return it }
+        return logoMutex.withLock {
+            logoIndex ?: runCatching {
+                val week = 7L * 24 * 60 * 60 * 1000
+                val ch = http.get("$IPTV/channels.json", "iptv_channels.json", week)
+                val lo = http.get("$IPTV/logos.json", "iptv_logos.json", week)
+                withContext(Dispatchers.Default) {
+                    LogoIndex.build(json.decodeFromString<List<IptvLogoChannel>>(ch), json.decodeFromString<List<IptvLogo>>(lo))
+                }
+            }.getOrNull()?.also { logoIndex = it }
+        }
     }
 
     // ---------------- TV schedules (TVmaze) ----------------

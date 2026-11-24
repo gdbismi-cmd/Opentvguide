@@ -36,6 +36,7 @@ import com.worldtv.guide.ui.components.SnapTopBar
 import com.worldtv.guide.ui.theme.Snap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.worldtv.guide.data.FavShow
 import com.worldtv.guide.data.Prefs
-import com.worldtv.guide.data.TvRepository
+import com.worldtv.guide.data.Programme
 import com.worldtv.guide.ui.components.CenterMessage
 import com.worldtv.guide.ui.theme.LiveRed
 import com.worldtv.guide.util.localDateTime
@@ -58,8 +59,8 @@ import java.time.Instant
 /** Detail page for a programme that came from an XMLTV guide. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ProgrammeDetailScreen(id: String, repo: TvRepository, prefs: Prefs) {
-    val p = repo.programme(id)
+fun ProgrammeDetailScreen(id: String, lookup: (String) -> Programme?, prefs: Prefs) {
+    val p = remember(id) { lookup(id) }
     val favShows by prefs.favShows.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val following = p != null && favShows.any { it.key == p.favKey }
@@ -121,10 +122,15 @@ fun ProgrammeDetailScreen(id: String, repo: TvRepository, prefs: Prefs) {
                         p.genres.forEach { AssistChip(onClick = {}, label = { Text(it) }) }
                     }
                 }
-                p.description?.let {
-                    Spacer(Modifier.height(16.dp))
-                    Text(it, style = MaterialTheme.typography.bodyLarge)
-                }
+                Spacer(Modifier.height(16.dp))
+                Text("About this programme", style = MaterialTheme.typography.titleSmall, color = Snap.Accent)
+                Spacer(Modifier.height(4.dp))
+                val desc = p.description?.takeIf { it.isNotBlank() }
+                Text(
+                    desc ?: "No description is available for this programme from ${p.sourceName}.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (desc != null) MaterialTheme.colorScheme.onSurface else Snap.Muted,
+                )
                 Spacer(Modifier.height(24.dp))
                 if (p.end.isAfter(Instant.now())) {
                     Button(onClick = {

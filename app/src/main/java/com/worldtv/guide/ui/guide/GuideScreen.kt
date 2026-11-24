@@ -395,6 +395,11 @@ fun ProgrammeRow(p: Programme, now: Instant, showChannel: Boolean, fav: Boolean,
                 fontWeight = FontWeight.Bold)
             val sub = listOfNotNull(p.subtitle, p.genres.firstOrNull()).joinToString(" · ")
             if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = Snap.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Short description preview; the full text is on the programme page.
+            p.description?.takeIf { it.isNotBlank() }?.let { d ->
+                Text(d, fontSize = 12.sp, lineHeight = 15.sp, color = Snap.Text.copy(alpha = 0.72f),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            }
             if (live) {
                 Spacer(Modifier.height(5.dp))
                 LinearProgressIndicator(
